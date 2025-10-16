@@ -3,27 +3,103 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistem Absensi Online</title>
+    <meta name="description" content="Sistem Absensi Online dengan teknologi Face Recognition dan Firebase untuk manajemen kehadiran karyawan">
+    <meta name="author" content="Sabeni H">
+    <title>Sistem Absensi Online - Portal Karyawan & Admin</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom animations */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .fade-in {
+            animation: fadeIn 0.6s ease-out;
+        }
+    </style>
 </head>
-<body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen flex items-center justify-center">
-    <div class="bg-white p-8 rounded-2xl shadow-2xl max-w-md w-full">
-        <h1 class="text-3xl font-bold text-center text-gray-800 mb-8">Sistem Absensi Online</h1>
+<body class="bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 min-h-screen flex items-center justify-center p-4">
+    <div class="bg-white p-8 rounded-2xl shadow-2xl max-w-md w-full fade-in">
+        <!-- Header -->
+        <div class="text-center mb-8">
+            <div class="inline-block p-3 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full mb-4">
+                <svg class="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+            </div>
+            <h1 class="text-3xl font-bold text-gray-800 mb-2">Sistem Absensi Online</h1>
+            <p class="text-gray-600 text-sm">Kelola kehadiran karyawan dengan mudah</p>
+        </div>
         
+        <!-- Navigation Buttons -->
         <div class="space-y-4">
-            <a href="employee.html" class="block w-full bg-blue-500 hover:bg-blue-600 text-white text-center font-bold py-4 px-6 rounded-lg transition transform hover:scale-105">
-                👤 Portal Karyawan
+            <a href="employee.html" 
+               class="group block w-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white text-center font-bold py-4 px-6 rounded-lg transition-all duration-300 transform hover:scale-105 hover:shadow-lg"
+               aria-label="Akses Portal Karyawan">
+                <span class="flex items-center justify-center space-x-3">
+                    <span aria-hidden="true" class="text-2xl">👤</span>
+                    <span>Portal Karyawan</span>
+                </span>
+                <p class="text-xs text-blue-100 mt-1 opacity-90">Absen masuk & keluar</p>
             </a>
             
-            <a href="admin.html" class="block w-full bg-green-500 hover:bg-green-600 text-white text-center font-bold py-4 px-6 rounded-lg transition transform hover:scale-105">
-                👨‍💼 Dashboard Admin
+            <a href="admin.html" 
+               class="group block w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white text-center font-bold py-4 px-6 rounded-lg transition-all duration-300 transform hover:scale-105 hover:shadow-lg"
+               aria-label="Akses Dashboard Admin">
+                <span class="flex items-center justify-center space-x-3">
+                    <span aria-hidden="true" class="text-2xl">👨‍💼</span>
+                    <span>Dashboard Admin</span>
+                </span>
+                <p class="text-xs text-green-100 mt-1 opacity-90">Kelola data & laporan</p>
             </a>
         </div>
         
+        <!-- Features -->
+        <div class="mt-8 pt-6 border-t border-gray-200">
+            <p class="text-center text-sm font-semibold text-gray-700 mb-3">Fitur Unggulan:</p>
+            <div class="grid grid-cols-2 gap-3 text-center">
+                <div class="bg-blue-50 rounded-lg p-3">
+                    <span class="text-2xl mb-1 block">📸</span>
+                    <p class="text-xs text-gray-700 font-medium">Face Recognition</p>
+                </div>
+                <div class="bg-green-50 rounded-lg p-3">
+                    <span class="text-2xl mb-1 block">📊</span>
+                    <p class="text-xs text-gray-700 font-medium">Laporan Realtime</p>
+                </div>
+                <div class="bg-purple-50 rounded-lg p-3">
+                    <span class="text-2xl mb-1 block">📍</span>
+                    <p class="text-xs text-gray-700 font-medium">GPS Tracking</p>
+                </div>
+                <div class="bg-orange-50 rounded-lg p-3">
+                    <span class="text-2xl mb-1 block">☁️</span>
+                    <p class="text-xs text-gray-700 font-medium">Cloud Storage</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Footer -->
         <div class="mt-8 text-center text-sm text-gray-500">
-            <p>© 2024 Sistem Absensi</p>
-            <p>Powered by Face Recognition & Firebase</p>
+            <p id="copyright"></p>
+            <p class="mt-1">Powered by Face Recognition & Firebase</p>
+            <p class="mt-2 text-xs text-gray-400">
+                <a href="#" class="hover:text-blue-500 transition">Bantuan</a> • 
+                <a href="#" class="hover:text-blue-500 transition">Kontak</a>
+            </p>
         </div>
     </div>
+
+    <script>
+        // Auto-update copyright year
+        document.getElementById('copyright').textContent = `© ${new Date().getFullYear()} Sistem Absensi`;
+        
+        // Add loading indicator (optional)
+        window.addEventListener('load', () => {
+            document.body.style.opacity = '0';
+            document.body.style.transition = 'opacity 0.3s';
+            setTimeout(() => {
+                document.body.style.opacity = '1';
+            }, 100);
+        });
+    </script>
 </body>
 </html>
