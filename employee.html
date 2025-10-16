@@ -1,18 +1,36 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Form Absensi Karyawan</title>
+
+    <!-- Library -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+
+    <!-- Style -->
     <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        /* Video Container */
         .relative-container {
             position: relative;
             width: 100%;
             padding-top: 75%;
+            background-color: #000;
         }
-        #video, #canvas {
+
+        #video,
+        #canvas {
             position: absolute;
             top: 0;
             left: 0;
@@ -20,6 +38,8 @@
             height: 100%;
             object-fit: cover;
         }
+
+        /* Loader Animation */
         .loader {
             border: 8px solid #f3f3f3;
             border-radius: 50%;
@@ -28,107 +48,183 @@
             height: 60px;
             animation: spin 2s linear infinite;
         }
+
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+
+        /* Clock Styling */
         .clock {
             font-family: 'Courier New', monospace;
             font-size: 3rem;
             font-weight: bold;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Custom Scrollbar */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 10px;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+
+        /* Responsive Clock */
+        @media (max-width: 768px) {
+            .clock {
+                font-size: 2rem;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .clock {
+                font-size: 1.5rem;
+            }
         }
     </style>
 </head>
+
 <body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen">
 
+    <!-- ========== LOADER ========== -->
     <div id="loader-container" class="fixed inset-0 bg-white bg-opacity-90 flex flex-col justify-center items-center z-50">
         <div class="loader"></div>
-        <p id="loader-text" class="mt-4 text-lg font-semibold">Memuat sistem...</p>
+        <p id="loader-text" class="mt-4 text-lg font-semibold text-gray-700">Memuat sistem...</p>
     </div>
 
-    <!-- Modal Alert -->
+    <!-- ========== MODAL ALERT ========== -->
     <div id="alertModal" class="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 hidden">
-        <div class="bg-white p-6 rounded-xl shadow-2xl text-center max-w-md w-full mx-4 transform transition-all">
+        <div class="bg-white p-8 rounded-2xl shadow-2xl text-center max-w-md w-full mx-4 transform transition-all">
             <div id="alertIcon" class="text-6xl mb-4">✅</div>
-            <p id="alertMessage" class="text-xl font-semibold mb-2"></p>
-            <p id="alertDetail" class="text-gray-600 mb-4"></p>
-            <button id="alertClose" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-8 rounded-lg transition">OK</button>
+            <p id="alertMessage" class="text-xl font-bold mb-2 text-gray-800"></p>
+            <p id="alertDetail" class="text-gray-600 mb-6"></p>
+            <button id="alertClose" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-8 rounded-lg transition duration-300 transform hover:scale-105">
+                OK
+            </button>
         </div>
     </div>
 
-    <div class="container mx-auto p-4 max-w-6xl">
-        <!-- Header -->
-        <header class="text-center mb-8 pt-8">
-            <h1 class="text-4xl font-bold text-gray-800 mb-2">Sistem Absensi Karyawan</h1>
-            
+    <!-- ========== MAIN CONTAINER ========== -->
+    <div class="container mx-auto px-4 py-6 max-w-7xl">
+
+        <!-- ========== HEADER ========== -->
+        <header class="text-center mb-8">
+            <h1 class="text-3xl md:text-4xl lg:text-5xl font-bold text-gray-800 mb-4">
+                🏢 Sistem Absensi Karyawan
+            </h1>
+
             <!-- Real-time Clock -->
             <div id="clock" class="clock text-blue-600 my-4">00:00:00</div>
-            <div id="date" class="text-lg text-gray-600 mb-4">Loading...</div>
-            
+            <div id="date" class="text-base md:text-lg text-gray-600 mb-4">Loading...</div>
+
             <!-- Location Status -->
-            <div class="inline-flex items-center gap-2 bg-white px-4 py-2 rounded-full shadow-md">
-                <span id="locationIcon">📍</span>
-                <span id="locationText" class="text-sm">Mendapatkan lokasi...</span>
+            <div class="inline-flex items-center gap-2 bg-white px-6 py-3 rounded-full shadow-lg border border-gray-200">
+                <span id="locationIcon" class="text-xl">📍</span>
+                <span id="locationText" class="text-sm md:text-base font-medium text-gray-700">
+                    Mendapatkan lokasi...
+                </span>
             </div>
         </header>
 
-        <main class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <!-- Video Section -->
-            <div class="bg-white rounded-2xl shadow-xl p-6">
-                <h2 class="text-2xl font-bold mb-4 text-gray-800">📸 Kamera</h2>
-                <div class="relative-container rounded-xl overflow-hidden border-2 border-gray-200">
+        <!-- ========== MAIN CONTENT ========== -->
+        <main class="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
+
+            <!-- ========== SECTION: KAMERA ========== -->
+            <section class="bg-white rounded-2xl shadow-xl p-6 lg:p-8">
+                <h2 class="text-2xl font-bold mb-6 text-gray-800 flex items-center gap-2">
+                    <span>📸</span>
+                    <span>Kamera</span>
+                </h2>
+
+                <!-- Video Container -->
+                <div class="relative-container rounded-xl overflow-hidden border-4 border-gray-200 shadow-inner mb-4">
                     <video id="video" autoplay muted playsinline></video>
                     <canvas id="canvas"></canvas>
                 </div>
-                
-                <!-- User Recognition Status -->
-                <div id="recognitionStatus" class="mt-4 p-4 rounded-lg bg-gray-50 text-center">
-                    <p class="text-sm text-gray-500">Arahkan wajah ke kamera</p>
-                    <p id="recognizedName" class="text-2xl font-bold text-gray-800 mt-2">-</p>
-                </div>
-            </div>
 
-            <!-- Attendance Section -->
+                <!-- Recognition Status -->
+                <div id="recognitionStatus" class="p-6 rounded-xl bg-gradient-to-r from-gray-50 to-gray-100 text-center border border-gray-200">
+                    <p class="text-sm text-gray-500 mb-2">Arahkan wajah ke kamera</p>
+                    <p id="recognizedName" class="text-2xl md:text-3xl font-bold text-gray-800">-</p>
+                </div>
+            </section>
+
+            <!-- ========== SECTION: ABSENSI & AKTIVITAS ========== -->
             <div class="space-y-6">
-                <!-- Attendance Buttons -->
-                <div class="bg-white rounded-2xl shadow-xl p-6">
-                    <h2 class="text-2xl font-bold mb-6 text-gray-800">⏰ Absensi</h2>
-                    
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <button id="checkInBtn" class="bg-green-500 hover:bg-green-600 text-white font-bold py-6 px-6 rounded-xl transition transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed">
-                            <span class="text-3xl mb-2 block">📥</span>
-                            <span class="text-lg">MASUK</span>
-                            <span id="checkInTime" class="block text-sm mt-1 opacity-75">Belum absen</span>
-                        </button>
-                        
-                        <button id="checkOutBtn" class="bg-red-500 hover:bg-red-600 text-white font-bold py-6 px-6 rounded-xl transition transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed">
-                            <span class="text-3xl mb-2 block">📤</span>
-                            <span class="text-lg">PULANG</span>
-                            <span id="checkOutTime" class="block text-sm mt-1 opacity-75">Belum absen</span>
-                        </button>
-                    </div>
-                    
-                    <!-- Work Duration -->
-                    <div id="workDuration" class="mt-6 p-4 bg-blue-50 rounded-lg hidden">
-                        <p class="text-sm text-gray-600">Durasi Kerja Hari Ini:</p>
-                        <p class="text-2xl font-bold text-blue-600" id="durationText">0 jam 0 menit</p>
-                    </div>
-                </div>
 
-                <!-- Today's Activity -->
-                <div class="bg-white rounded-2xl shadow-xl p-6">
-                    <h2 class="text-2xl font-bold mb-4 text-gray-800">📊 Aktivitas Hari Ini</h2>
-                    <div id="todayActivity" class="space-y-3 max-h-64 overflow-y-auto">
-                        <p class="text-gray-500 text-center py-4">Belum ada aktivitas</p>
+                <!-- Absensi Buttons -->
+                <section class="bg-white rounded-2xl shadow-xl p-6 lg:p-8">
+                    <h2 class="text-2xl font-bold mb-6 text-gray-800 flex items-center gap-2">
+                        <span>⏰</span>
+                        <span>Absensi</span>
+                    </h2>
+
+                    <!-- Buttons Grid -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <!-- Check In Button -->
+                        <button id="checkInBtn" class="bg-gradient-to-br from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-bold py-6 px-6 rounded-xl shadow-lg transition transform hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none">
+                            <span class="text-4xl mb-2 block">📥</span>
+                            <span class="text-xl block mb-1">MASUK</span>
+                            <span id="checkInTime" class="block text-sm opacity-90">Belum absen</span>
+                        </button>
+
+                        <!-- Check Out Button -->
+                        <button id="checkOutBtn" class="bg-gradient-to-br from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white font-bold py-6 px-6 rounded-xl shadow-lg transition transform hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none">
+                            <span class="text-4xl mb-2 block">📤</span>
+                            <span class="text-xl block mb-1">PULANG</span>
+                            <span id="checkOutTime" class="block text-sm opacity-90">Belum absen</span>
+                        </button>
                     </div>
-                </div>
+
+                    <!-- Work Duration -->
+                    <div id="workDuration" class="mt-6 p-6 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border-2 border-blue-200 hidden">
+                        <p class="text-sm text-gray-600 mb-1">⏱️ Durasi Kerja Hari Ini:</p>
+                        <p id="durationText" class="text-2xl md:text-3xl font-bold text-blue-600">
+                            0 jam 0 menit
+                        </p>
+                    </div>
+                </section>
+
+                <!-- Today Activity -->
+                <section class="bg-white rounded-2xl shadow-xl p-6 lg:p-8">
+                    <h2 class="text-2xl font-bold mb-6 text-gray-800 flex items-center gap-2">
+                        <span>📊</span>
+                        <span>Aktivitas Hari Ini</span>
+                    </h2>
+
+                    <div id="todayActivity" class="space-y-3 max-h-72 overflow-y-auto custom-scrollbar pr-2">
+                        <p class="text-gray-500 text-center py-8">Belum ada aktivitas</p>
+                    </div>
+                </section>
+
             </div>
+
         </main>
+
+        <!-- ========== FOOTER ========== -->
+        <footer class="mt-8 text-center text-gray-600 text-sm">
+            <p>&copy; 2024 Sistem Absensi Karyawan. All rights reserved.</p>
+        </footer>
+
     </div>
 
+    <!-- ========== JAVASCRIPT ========== -->
     <script>
-        // === STORAGE MANAGER ===
+        // ===================================
+        // STORAGE MANAGER
+        // ===================================
         class StorageManager {
             constructor() {
                 this.USERS_KEY = 'faceRecognition_users';
@@ -151,10 +247,10 @@
 
             addAttendance(record) {
                 const attendance = this.getAttendance();
-                attendance.push({ 
-                    id: Date.now().toString(), 
-                    timestamp: new Date().toISOString(), 
-                    ...record 
+                attendance.push({
+                    id: Date.now().toString(),
+                    timestamp: new Date().toISOString(),
+                    ...record
                 });
                 this.saveAttendance(attendance);
                 return attendance;
@@ -164,16 +260,18 @@
                 const all = this.getAttendance();
                 const today = new Date().toDateString();
                 let filtered = all.filter(a => new Date(a.timestamp).toDateString() === today);
-                
+
                 if (name) {
                     filtered = filtered.filter(a => a.name === name);
                 }
-                
+
                 return filtered;
             }
         }
 
-        // === VOICE MANAGER ===
+        // ===================================
+        // VOICE MANAGER
+        // ===================================
         class VoiceManager {
             constructor() {
                 this.synthesis = window.speechSynthesis;
@@ -181,7 +279,7 @@
 
             speak(text) {
                 if (!('speechSynthesis' in window)) return;
-                
+
                 this.synthesis.cancel();
                 const utterance = new SpeechSynthesisUtterance(text);
                 utterance.lang = 'id-ID';
@@ -190,7 +288,9 @@
             }
         }
 
-        // === LOCATION MANAGER ===
+        // ===================================
+        // LOCATION MANAGER
+        // ===================================
         class LocationManager {
             constructor() {
                 this.currentLocation = null;
@@ -210,7 +310,7 @@
                                 longitude: position.coords.longitude,
                                 accuracy: position.coords.accuracy
                             };
-                            
+
                             try {
                                 const address = await this.reverseGeocode(coords.latitude, coords.longitude);
                                 this.currentLocation = {
@@ -240,17 +340,17 @@
                         `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`,
                         { headers: { 'Accept-Language': 'id' } }
                     );
-                    
+
                     if (!response.ok) throw new Error('Geocoding failed');
-                    
+
                     const data = await response.json();
                     const address = data.address;
                     const parts = [];
-                    
+
                     if (address.road) parts.push(address.road);
                     if (address.suburb) parts.push(address.suburb);
                     if (address.city || address.town) parts.push(address.city || address.town);
-                    
+
                     return parts.length > 0 ? parts.join(', ') : data.display_name;
                 } catch (error) {
                     return `${lat.toFixed(6)}, ${lon.toFixed(6)}`;
@@ -258,12 +358,16 @@
             }
         }
 
-        // === Initialize Managers ===
+        // ===================================
+        // INITIALIZE MANAGERS
+        // ===================================
         const storage = new StorageManager();
         const voiceManager = new VoiceManager();
         const locationManager = new LocationManager();
 
-        // === DOM Elements ===
+        // ===================================
+        // DOM ELEMENTS
+        // ===================================
         const video = document.getElementById('video');
         const canvas = document.getElementById('canvas');
         const checkInBtn = document.getElementById('checkInBtn');
@@ -286,25 +390,32 @@
         const locationText = document.getElementById('locationText');
         const locationIcon = document.getElementById('locationIcon');
 
-        // === Global Variables ===
+        // ===================================
+        // GLOBAL VARIABLES
+        // ===================================
         let faceMatcher = null;
         let currentUser = null;
 
-        // === Clock Update ===
+        // ===================================
+        // CLOCK UPDATE
+        // ===================================
         function updateClock() {
             const now = new Date();
             clock.textContent = now.toLocaleTimeString('id-ID');
-            dateElement.textContent = now.toLocaleDateString('id-ID', { 
-                weekday: 'long', 
-                year: 'numeric', 
-                month: 'long', 
-                day: 'numeric' 
+            dateElement.textContent = now.toLocaleDateString('id-ID', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
             });
         }
+
         setInterval(updateClock, 1000);
         updateClock();
 
-        // === Show Alert ===
+        // ===================================
+        // SHOW ALERT
+        // ===================================
         function showAlert(message, detail = '', icon = '✅') {
             alertMessage.textContent = message;
             alertDetail.textContent = detail;
@@ -317,12 +428,14 @@
             alertModal.classList.add('hidden');
         });
 
-        // === Update Location ===
+        // ===================================
+        // UPDATE LOCATION
+        // ===================================
         async function updateLocation() {
             try {
                 locationText.textContent = 'Mendapatkan lokasi...';
                 locationIcon.textContent = '🔄';
-                
+
                 const location = await locationManager.getCurrentLocation();
                 locationIcon.textContent = '📍';
                 locationText.textContent = location.address;
@@ -332,16 +445,21 @@
             }
         }
 
-        // === Load Models ===
+        // ===================================
+        // LOAD MODELS
+        // ===================================
         async function loadModels() {
             const MODEL_URL = 'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@0.22.2/weights';
             try {
                 loaderText.innerText = 'Memuat model deteksi wajah...';
                 await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
+
                 loaderText.innerText = 'Memuat model landmark wajah...';
                 await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
+
                 loaderText.innerText = 'Memuat model pengenalan wajah...';
                 await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
+
                 return true;
             } catch (error) {
                 console.error("Gagal memuat model:", error);
@@ -349,17 +467,23 @@
             }
         }
 
-        // === Start Webcam ===
+        // ===================================
+        // START WEBCAM
+        // ===================================
         function startWebcam() {
             navigator.mediaDevices.getUserMedia({ video: {} })
-                .then(stream => { video.srcObject = stream; })
+                .then(stream => {
+                    video.srcObject = stream;
+                })
                 .catch(err => {
                     console.error("Error:", err);
                     showAlert("Tidak bisa mengakses kamera", "Pastikan Anda memberikan izin", "❌");
                 });
         }
 
-        // === Load Face Matcher ===
+        // ===================================
+        // LOAD FACE MATCHER
+        // ===================================
         function loadFaceMatcher() {
             const users = storage.getUsers();
             if (users.length > 0) {
@@ -371,15 +495,17 @@
             }
         }
 
-        // === Update Today Activity ===
+        // ===================================
+        // UPDATE TODAY ACTIVITY
+        // ===================================
         function updateTodayActivity() {
             if (!currentUser) return;
-            
+
             const activities = storage.getTodayAttendance(currentUser);
             todayActivity.innerHTML = '';
-            
+
             if (activities.length === 0) {
-                todayActivity.innerHTML = '<p class="text-gray-500 text-center py-4">Belum ada aktivitas</p>';
+                todayActivity.innerHTML = '<p class="text-gray-500 text-center py-8">Belum ada aktivitas</p>';
                 checkInTime.textContent = 'Belum absen';
                 checkOutTime.textContent = 'Belum absen';
                 workDuration.classList.add('hidden');
@@ -391,7 +517,10 @@
             const checkOut = activities.find(a => a.type === 'check-out');
 
             if (checkIn) {
-                const time = new Date(checkIn.timestamp).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+                const time = new Date(checkIn.timestamp).toLocaleTimeString('id-ID', {
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
                 checkInTime.textContent = time;
                 checkInBtn.disabled = true;
             } else {
@@ -399,7 +528,10 @@
             }
 
             if (checkOut) {
-                const time = new Date(checkOut.timestamp).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+                const time = new Date(checkOut.timestamp).toLocaleTimeString('id-ID', {
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
                 checkOutTime.textContent = time;
                 checkOutBtn.disabled = true;
             } else {
@@ -419,23 +551,25 @@
             activities.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
             activities.forEach(activity => {
                 const div = document.createElement('div');
-                div.className = 'flex justify-between items-center p-3 bg-gray-50 rounded-lg';
-                
-                const type = activity.type === 'check-in' ? 
-                    '<span class="text-green-600 font-semibold">📥 Masuk</span>' : 
-                    '<span class="text-red-600 font-semibold">📤 Pulang</span>';
-                
+                div.className = 'flex justify-between items-center p-4 bg-gradient-to-r from-gray-50 to-gray-100 rounded-lg border border-gray-200 hover:shadow-md transition';
+
+                const type = activity.type === 'check-in' ?
+                    '<span class="text-green-600 font-semibold flex items-center gap-2"><span class="text-xl">📥</span> Masuk</span>' :
+                    '<span class="text-red-600 font-semibold flex items-center gap-2"><span class="text-xl">📤</span> Pulang</span>';
+
                 const time = new Date(activity.timestamp).toLocaleTimeString('id-ID');
-                
+
                 div.innerHTML = `
-                    ${type}
-                    <span class="text-gray-600 text-sm">${time}</span>
+                    <div>${type}</div>
+                    <span class="text-gray-600 text-sm font-medium">${time}</span>
                 `;
                 todayActivity.appendChild(div);
             });
         }
 
-        // === Handle Check In/Out ===
+        // ===================================
+        // HANDLE ATTENDANCE
+        // ===================================
         async function handleAttendance(type) {
             if (!currentUser) {
                 showAlert("Wajah tidak dikenali", "Pastikan wajah Anda terlihat jelas di kamera", "⚠️");
@@ -445,9 +579,13 @@
             // Check if already done today
             const todayAttendance = storage.getTodayAttendance(currentUser);
             const alreadyDone = todayAttendance.find(a => a.type === type);
-            
+
             if (alreadyDone) {
-                showAlert("Sudah melakukan absensi", `Anda sudah ${type === 'check-in' ? 'masuk' : 'pulang'} hari ini`, "⚠️");
+                showAlert(
+                    "Sudah melakukan absensi",
+                    `Anda sudah ${type === 'check-in' ? 'masuk' : 'pulang'} hari ini`,
+                    "⚠️"
+                );
                 return;
             }
 
@@ -477,59 +615,64 @@
         checkInBtn.addEventListener('click', () => handleAttendance('check-in'));
         checkOutBtn.addEventListener('click', () => handleAttendance('check-out'));
 
-        // === Face Detection Loop ===
+        // ===================================
+        // FACE DETECTION LOOP
+        // ===================================
         video.addEventListener('play', () => {
             const displaySize = { width: video.clientWidth, height: video.clientHeight };
             faceapi.matchDimensions(canvas, displaySize);
-            
+
             setInterval(async () => {
                 if (!faceMatcher) return;
-                
-                const detections = await faceapi.detectAllFaces(video, new faceapi.TinyFaceDetectorOptions())
+
+                const detections = await faceapi
+                    .detectAllFaces(video, new faceapi.TinyFaceDetectorOptions())
                     .withFaceLandmarks()
                     .withFaceDescriptors();
-                
+
                 const resizedDetections = faceapi.resizeResults(detections, displaySize);
                 const ctx = canvas.getContext('2d');
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
-                
+
                 let recognized = false;
-                
+
                 resizedDetections.forEach(detection => {
                     const result = faceMatcher.findBestMatch(detection.descriptor);
                     const box = detection.detection.box;
-                    
+
                     if (result.label !== 'unknown') {
                         currentUser = result.label;
                         recognized = true;
                         recognizedName.textContent = currentUser;
-                        recognizedName.className = 'text-2xl font-bold text-green-600 mt-2';
-                        
-                        const drawBox = new faceapi.draw.DrawBox(box, { 
+                        recognizedName.className = 'text-2xl md:text-3xl font-bold text-green-600 mt-2';
+
+                        const drawBox = new faceapi.draw.DrawBox(box, {
                             label: currentUser,
                             boxColor: 'green'
                         });
                         drawBox.draw(canvas);
                     } else {
-                        const drawBox = new faceapi.draw.DrawBox(box, { 
+                        const drawBox = new faceapi.draw.DrawBox(box, {
                             label: 'Tidak Dikenali',
                             boxColor: 'red'
                         });
                         drawBox.draw(canvas);
                     }
                 });
-                
+
                 if (!recognized) {
                     currentUser = null;
                     recognizedName.textContent = 'Tidak Dikenali';
-                    recognizedName.className = 'text-2xl font-bold text-red-600 mt-2';
+                    recognizedName.className = 'text-2xl md:text-3xl font-bold text-red-600 mt-2';
                 } else {
                     updateTodayActivity();
                 }
             }, 500);
         });
 
-        // === Initialize ===
+        // ===================================
+        // INITIALIZE APPLICATION
+        // ===================================
         async function initialize() {
             try {
                 await loadModels();
@@ -544,7 +687,9 @@
             }
         }
 
+        // Start the application
         initialize();
     </script>
+
 </body>
 </html>
