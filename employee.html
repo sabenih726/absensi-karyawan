@@ -5,9 +5,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Form Absensi Karyawan</title>
 
-    <!-- Library -->
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Face API -->
     <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+
+    <!-- Firebase -->
+    <script type="module" src="firebase-config.js"></script>
+    <script src="storage-firebase.js"></script>
+
+    <!-- Preload models for faster loading (optional) -->
+    <link rel="preload" href="https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@0.22.2/weights/tiny_face_detector_model-weights_manifest.json" as="fetch" crossorigin>
 
     <!-- Style -->
     <style>
@@ -81,20 +90,7 @@
             background: #555;
         }
 
-        /* Responsive Clock */
-        @media (max-width: 768px) {
-            .clock {
-                font-size: 2rem;
-            }
-        }
-
-        @media (max-width: 480px) {
-            .clock {
-                font-size: 1.5rem;
-            }
-        }
-
-        /* Pulse animation for waiting */
+        /* Pulse animation */
         @keyframes pulse {
             0%, 100% { opacity: 1; }
             50% { opacity: 0.5; }
@@ -102,6 +98,60 @@
 
         .pulse {
             animation: pulse 2s ease-in-out infinite;
+        }
+
+        /* Pulse slow for mobile indicator */
+        @keyframes pulse-slow {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+
+        .animate-pulse {
+            animation: pulse-slow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+
+        /* Mobile Optimizations */
+        @media (max-width: 768px) {
+            .clock {
+                font-size: 2rem;
+            }
+            
+            .relative-container {
+                padding-top: 100%; /* More square on mobile */
+            }
+            
+            #video, #canvas {
+                border-radius: 12px;
+            }
+            
+            button {
+                font-size: 0.9rem;
+                padding: 0.75rem 1rem;
+            }
+            
+            .container {
+                padding-left: 0.75rem;
+                padding-right: 0.75rem;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .clock {
+                font-size: 1.5rem;
+            }
+            
+            h1 {
+                font-size: 1.5rem !important;
+            }
+        }
+
+        /* Performance optimization - disable animations on low-end devices */
+        @media (prefers-reduced-motion: reduce) {
+            * {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
         }
     </style>
 </head>
@@ -113,6 +163,15 @@
         <div class="loader"></div>
         <p id="loader-text" class="mt-4 text-lg font-semibold text-gray-700">Memuat sistem...</p>
         <p id="loader-status" class="mt-2 text-sm text-gray-500">Menginisialisasi...</p>
+    </div>
+
+    <!-- ========== LOADING PROGRESS (Mobile) ========== -->
+    <div id="loadingProgress" class="hidden fixed bottom-4 right-4 bg-white p-4 rounded-lg shadow-lg z-50 max-w-xs">
+        <p class="text-sm font-semibold mb-2">Loading Models...</p>
+        <div class="w-full bg-gray-200 rounded-full h-2">
+            <div id="progressBar" class="bg-blue-600 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+        </div>
+        <p id="progressText" class="text-xs text-gray-600 mt-1">0%</p>
     </div>
 
     <!-- ========== MODAL ALERT ========== -->
@@ -163,6 +222,20 @@
                 <div class="relative-container rounded-xl overflow-hidden border-4 border-gray-200 shadow-inner mb-4">
                     <video id="video" autoplay muted playsinline></video>
                     <canvas id="canvas"></canvas>
+                </div>
+
+                <!-- Mobile Performance Indicator -->
+                <div id="mobileIndicator" class="hidden mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                    <div class="flex items-center gap-2">
+                        <span class="text-blue-600">📱</span>
+                        <div class="flex-1">
+                            <p class="text-sm font-semibold text-blue-800">Mode Mobile Aktif</p>
+                            <p class="text-xs text-blue-600">Deteksi diperlambat untuk performa optimal</p>
+                        </div>
+                        <div id="performanceIndicator" class="text-2xl">
+                            <span class="inline-block animate-pulse">⏳</span>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Recognition Status -->
@@ -232,12 +305,26 @@
 
     </div>
 
-    <!-- ========== FIREBASE CONFIGURATION ========== -->
-    <script type="module" src="firebase-config.js"></script>
-    <script src="storage-firebase.js"></script>
-
     <!-- ========== JAVASCRIPT ========== -->
     <script>
+        // ===================================
+        // MOBILE OPTIMIZATION CONFIGURATION
+        // ===================================
+        const IS_MOBILE = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        const DETECTION_INTERVAL = IS_MOBILE ? 1500 : 500; // Slower on mobile (1.5s vs 0.5s)
+        const VIDEO_WIDTH = IS_MOBILE ? 320 : 640; // Lower resolution on mobile
+        const VIDEO_HEIGHT = IS_MOBILE ? 240 : 480;
+        const INPUT_SIZE = IS_MOBILE ? 224 : 416; // Smaller input for mobile
+        const SCORE_THRESHOLD = IS_MOBILE ? 0.4 : 0.5; // Lower threshold for mobile
+
+        console.log('📱 Device type:', IS_MOBILE ? 'MOBILE' : 'DESKTOP');
+        console.log('⚙️ Settings:', {
+            interval: DETECTION_INTERVAL,
+            resolution: `${VIDEO_WIDTH}x${VIDEO_HEIGHT}`,
+            inputSize: INPUT_SIZE,
+            threshold: SCORE_THRESHOLD
+        });
+
         // ===================================
         // VOICE MANAGER
         // ===================================
@@ -336,6 +423,7 @@
         let faceMatcher = null;
         let currentUser = null;
         let isSystemReady = false;
+        let detectionInterval = null;
 
         // ===================================
         // DOM ELEMENTS
@@ -363,6 +451,14 @@
         const dateElement = document.getElementById('date');
         const locationText = document.getElementById('locationText');
         const locationIcon = document.getElementById('locationIcon');
+        const loadingProgress = document.getElementById('loadingProgress');
+        const progressBar = document.getElementById('progressBar');
+        const progressText = document.getElementById('progressText');
+
+        // Show mobile indicator if on mobile
+        if (IS_MOBILE) {
+            document.getElementById('mobileIndicator').classList.remove('hidden');
+        }
 
         // ===================================
         // CLOCK UPDATE
@@ -419,53 +515,87 @@
         }
 
         // ===================================
-        // LOAD MODELS
+        // LOAD MODELS - OPTIMIZED FOR MOBILE
         // ===================================
         async function loadModels() {
             const MODEL_URL = 'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@0.22.2/weights';
+            
             try {
-                loaderText.innerText = 'Memuat model deteksi wajah...';
-                loaderStatus.innerText = 'TinyFaceDetector...';
+                loaderText.innerText = 'Memuat model AI...';
+                
+                if (IS_MOBILE) {
+                    loaderStatus.innerText = 'Mode Mobile - Loading optimized models...';
+                    loadingProgress.classList.remove('hidden');
+                    console.log('📱 Mobile device detected - using optimized settings');
+                }
+
+                // Load models with progress indication
+                loaderStatus.innerText = 'Loading TinyFaceDetector... (1/3)';
+                progressText.textContent = 'Loading TinyFaceDetector...';
+                progressBar.style.width = '0%';
                 await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
-
-                loaderText.innerText = 'Memuat model landmark wajah...';
-                loaderStatus.innerText = 'FaceLandmark68Net...';
+                progressBar.style.width = '33%';
+                
+                loaderStatus.innerText = 'Loading FaceLandmark... (2/3)';
+                progressText.textContent = 'Loading FaceLandmark...';
                 await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
-
-                loaderText.innerText = 'Memuat model pengenalan wajah...';
-                loaderStatus.innerText = 'FaceRecognitionNet...';
+                progressBar.style.width = '66%';
+                
+                loaderStatus.innerText = 'Loading FaceRecognition... (3/3)';
+                progressText.textContent = 'Loading FaceRecognition...';
                 await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
+                progressBar.style.width = '100%';
+                progressText.textContent = 'Complete!';
+
+                setTimeout(() => {
+                    loadingProgress.classList.add('hidden');
+                }, 1000);
 
                 console.log('✅ All face detection models loaded');
                 return true;
             } catch (error) {
                 console.error("❌ Gagal memuat model:", error);
+                loaderStatus.innerText = 'Error loading models. Please check connection.';
+                loadingProgress.classList.add('hidden');
                 return false;
             }
         }
 
         // ===================================
-        // START WEBCAM
+        // START WEBCAM - MOBILE OPTIMIZED
         // ===================================
         function startWebcam() {
-            navigator.mediaDevices.getUserMedia({ 
-                video: { 
-                    width: { ideal: 1280 },
-                    height: { ideal: 720 }
-                } 
-            })
-            .then(stream => {
-                video.srcObject = stream;
-                console.log('✅ Webcam started');
-            })
-            .catch(err => {
-                console.error("❌ Error accessing camera:", err);
-                showAlert("Tidak bisa mengakses kamera", "Pastikan Anda memberikan izin kamera", "❌");
-            });
+            // Mobile-optimized constraints
+            const constraints = {
+                video: {
+                    width: { ideal: VIDEO_WIDTH },
+                    height: { ideal: VIDEO_HEIGHT },
+                    facingMode: 'user', // Front camera
+                    frameRate: { ideal: IS_MOBILE ? 15 : 30 } // Lower FPS on mobile
+                }
+            };
+
+            navigator.mediaDevices.getUserMedia(constraints)
+                .then(stream => {
+                    video.srcObject = stream;
+                    console.log('✅ Webcam started');
+                    
+                    // Display actual video resolution
+                    video.onloadedmetadata = () => {
+                        console.log(`📹 Video resolution: ${video.videoWidth}x${video.videoHeight}`);
+                        if (IS_MOBILE) {
+                            console.log('📱 Mobile optimization active');
+                        }
+                    };
+                })
+                .catch(err => {
+                    console.error("❌ Error accessing camera:", err);
+                    showAlert("Tidak bisa mengakses kamera", "Pastikan Anda memberikan izin kamera", "❌");
+                });
         }
 
         // ===================================
-        // LOAD FACE MATCHER
+        // LOAD FACE MATCHER - WITH PROGRESS
         // ===================================
         async function loadFaceMatcher() {
             if (!storage) {
@@ -475,16 +605,19 @@
 
             try {
                 loaderText.innerText = 'Memuat data wajah...';
-                loaderStatus.innerText = 'Mengambil data dari Firebase...';
+                loaderStatus.innerText = 'Mengambil dari database...';
 
                 const users = await storage.getUsers();
                 console.log('📦 Loaded users:', users);
                 
                 if (users && users.length > 0) {
+                    loaderStatus.innerText = `Processing ${users.length} face(s)...`;
+                    
                     const labeledDescriptors = users.map(user => {
                         const descriptors = user.descriptors.map(d => new Float32Array(Object.values(d)));
                         return new faceapi.LabeledFaceDescriptors(user.label, descriptors);
                     });
+                    
                     faceMatcher = new faceapi.FaceMatcher(labeledDescriptors, 0.6);
                     console.log(`✅ Face matcher initialized with ${users.length} users`);
                 } else {
@@ -607,7 +740,7 @@
                         `Anda sudah ${type === 'check-in' ? 'masuk' : 'pulang'} hari ini`,
                         "⚠️"
                     );
-                    await updateTodayActivity(); // Re-enable buttons based on status
+                    await updateTodayActivity();
                     return;
                 }
 
@@ -647,25 +780,54 @@
         checkOutBtn.addEventListener('click', () => handleAttendance('check-out'));
 
         // ===================================
-        // FACE DETECTION LOOP
+        // FACE DETECTION LOOP - OPTIMIZED
         // ===================================
         video.addEventListener('play', () => {
             console.log('🎥 Video started, initializing face detection...');
             
-            const canvas = document.getElementById('canvas');
+            // Wait for video to be fully loaded
+            if (!video.videoWidth || !video.videoHeight) {
+                console.warn('⚠️ Video dimensions not ready, waiting...');
+                setTimeout(() => video.dispatchEvent(new Event('play')), 1000);
+                return;
+            }
+            
             const displaySize = { 
-                width: video.videoWidth || video.clientWidth, 
-                height: video.videoHeight || video.clientHeight 
+                width: video.videoWidth, 
+                height: video.videoHeight 
             };
             
             faceapi.matchDimensions(canvas, displaySize);
+            
+            console.log(`📐 Canvas size: ${displaySize.width}x${displaySize.height}`);
+            console.log(`⏱️ Detection interval: ${DETECTION_INTERVAL}ms`);
 
-            const detectionInterval = setInterval(async () => {
+            // Show mobile-specific message
+            if (IS_MOBILE) {
+                recognitionConfidence.textContent = 'Mobile mode: Detection setiap 1.5 detik';
+                recognitionConfidence.className = 'text-xs text-blue-500 mt-1';
+            }
+
+            // Clear any existing interval
+            if (detectionInterval) {
+                clearInterval(detectionInterval);
+            }
+
+            // Face detection with optimized interval
+            let detectionCount = 0;
+            detectionInterval = setInterval(async () => {
                 if (!faceMatcher || !isSystemReady) return;
 
+                detectionCount++;
+
                 try {
+                    const options = new faceapi.TinyFaceDetectorOptions({
+                        inputSize: INPUT_SIZE,
+                        scoreThreshold: SCORE_THRESHOLD
+                    });
+
                     const detections = await faceapi
-                        .detectAllFaces(video, new faceapi.TinyFaceDetectorOptions())
+                        .detectAllFaces(video, options)
                         .withFaceLandmarks()
                         .withFaceDescriptors();
 
@@ -710,7 +872,7 @@
                             currentUser = null;
                             recognizedName.textContent = 'Tidak Dikenali';
                             recognizedName.className = 'text-2xl md:text-3xl font-bold text-red-600 mt-2';
-                            recognitionConfidence.textContent = '';
+                            recognitionConfidence.textContent = IS_MOBILE ? 'Arahkan wajah ke kamera (mode mobile)' : '';
                             
                             // Reset to default state
                             checkInBtn.disabled = false;
@@ -720,14 +882,26 @@
                         // Update activity when user is recognized
                         updateTodayActivity();
                     }
+
+                    // Log every 10 detections on mobile
+                    if (IS_MOBILE && detectionCount % 10 === 0) {
+                        console.log(`📊 Detection #${detectionCount} completed`);
+                    }
+
                 } catch (error) {
                     console.error('❌ Face detection error:', error);
                 }
-            }, 500);
+            }, DETECTION_INTERVAL);
 
             // Clean up on page unload
             window.addEventListener('beforeunload', () => {
-                clearInterval(detectionInterval);
+                if (detectionInterval) {
+                    clearInterval(detectionInterval);
+                }
+                // Stop camera
+                if (video.srcObject) {
+                    video.srcObject.getTracks().forEach(track => track.stop());
+                }
             });
         });
 
@@ -739,11 +913,10 @@
                 loaderText.innerText = 'Menunggu Firebase...';
                 loaderStatus.innerText = 'Memeriksa koneksi...';
                 
-                // Wait for Firebase to be ready
+                // Wait for Firebase
                 if (window.waitForFirebase) {
                     await window.waitForFirebase();
                 } else {
-                    // Fallback: wait for firebaseDB to be available
                     await new Promise((resolve) => {
                         const checkFirebase = setInterval(() => {
                             if (window.firebaseDB && window.firebaseDB.isReady) {
@@ -752,7 +925,6 @@
                             }
                         }, 100);
                         
-                        // Timeout after 10 seconds
                         setTimeout(() => {
                             clearInterval(checkFirebase);
                             resolve();
@@ -760,8 +932,9 @@
                     });
                 }
                 
-                // Check if Firebase is connected
-                const isConnected = window.isFirebaseConnected ? window.isFirebaseConnected() : (window.firebaseDB && window.firebaseDB.db);
+                const isConnected = window.isFirebaseConnected ? 
+                    window.isFirebaseConnected() : 
+                    (window.firebaseDB && window.firebaseDB.db);
                 
                 if (!isConnected) {
                     throw new Error('Firebase tidak terhubung. Periksa koneksi internet Anda.');
@@ -776,7 +949,6 @@
                 voiceManager = new VoiceManager();
                 locationManager = new LocationManager();
                 
-                // Initialize storage
                 if (typeof FirebaseStorageManager === 'undefined') {
                     throw new Error('FirebaseStorageManager tidak ditemukan. Pastikan storage-firebase.js sudah dimuat.');
                 }
@@ -826,11 +998,13 @@
                 startWebcam();
                 
                 // Speak ready message
-                if (voiceManager) {
+                if (voiceManager && !IS_MOBILE) { // Don't speak on mobile to save battery
                     voiceManager.speak('Sistem absensi siap digunakan');
                 }
                 
                 console.log('✅ Initialization complete');
+                console.log('📱 Mobile mode:', IS_MOBILE);
+                
             } catch (error) {
                 console.error("❌ Init error:", error);
                 const errorInfo = window.handleFirebaseError ? window.handleFirebaseError(error) : { message: error.message };
@@ -845,36 +1019,26 @@
         // FIREBASE EVENT LISTENERS
         // ===================================
         
-        // Listen for Firebase ready event
         window.addEventListener('firebaseReady', () => {
             console.log('📢 Firebase ready event received');
             initialize();
         });
 
-        // Listen for Firebase auth success
         window.addEventListener('firebaseAuthSuccess', (e) => {
             console.log('✅ Firebase auth success:', e.detail);
         });
 
-        // Listen for Firebase auth failed
         window.addEventListener('firebaseAuthFailed', (e) => {
             console.error('❌ Firebase auth failed:', e.detail);
             loaderText.innerText = 'Gagal terhubung ke Firebase';
-            loaderStatus.innerText = 'Periksa koneksi internet Anda';
+            loaderStatus.innerText = 'Periksa koneksi internet';
             loaderStatus.classList.add('text-red-600');
-        });
-
-        // Listen for Firebase status updates
-        window.addEventListener('firebaseStatus', (e) => {
-            console.log(`Firebase status: ${e.detail.message}`);
-            loaderStatus.innerText = e.detail.message;
         });
 
         // ===================================
         // START APPLICATION
         // ===================================
         
-        // Check if Firebase is already ready
         if (window.firebaseDB && window.firebaseDB.isReady) {
             console.log('🚀 Firebase already ready, initializing immediately');
             initialize();
@@ -882,7 +1046,6 @@
             console.log('⏳ Waiting for Firebase to be ready...');
             loaderStatus.innerText = 'Menunggu Firebase...';
             
-            // Fallback: Initialize after timeout if no event received
             setTimeout(() => {
                 if (!isSystemReady) {
                     console.warn('⚠️ Timeout waiting for Firebase, attempting to initialize anyway');
@@ -892,7 +1055,7 @@
         }
 
         // ===================================
-        // ERROR HANDLING FOR UNHANDLED PROMISES
+        // ERROR HANDLING
         // ===================================
         window.addEventListener('unhandledrejection', (event) => {
             console.error('❌ Unhandled promise rejection:', event.reason);
@@ -902,7 +1065,18 @@
                 loaderStatus.classList.add('text-red-600');
             }
         });
+
+        // ===================================
+        // REGISTER SERVICE WORKER (Optional)
+        // ===================================
+        if ('serviceWorker' in navigator && IS_MOBILE) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(reg => console.log('✅ Service Worker registered'))
+                    .catch(err => console.log('❌ Service Worker registration failed:', err));
+            });
+        }
     </script>
 
 </body>
-</html>
+    </html>
