@@ -1,91 +1,81 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard Admin - Sistem Absensi</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
-    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
-    <style>
-        .loader {
-            border: 8px solid #f3f3f3;
-            border-radius: 50%;
-            border-top: 8px solid #3498db;
-            width: 60px;
-            height: 60px;
-            animation: spin 2s linear infinite;
-        }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        .tab-active {
-            background: linear-gradient(to right, #3b82f6, #6366f1);
-            color: white;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <title>Dashboard Admin - Sistem Absensi</title>
+
+  <!-- Library -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+
+  <style>
+    .loader {
+      border: 8px solid #f3f3f3;
+      border-radius: 50%;
+      border-top: 8px solid #3498db;
+      width: 60px;
+      height: 60px;
+      animation: spin 2s linear infinite;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg);}
+      100% { transform: rotate(360deg);}
+    }
+    .tab-active {
+      background: linear-gradient(to right, #3b82f6, #6366f1);
+      color: #fff;
+    }
+  </style>
 </head>
+
 <body class="bg-gray-100">
 
-    <!-- Loader -->
-    <div id="loader-container" class="fixed inset-0 bg-white bg-opacity-90 flex flex-col justify-center items-center z-50">
-        <div class="loader"></div>
-        <p class="mt-4 text-lg font-semibold">Memuat dashboard...</p>
+  <!-- Loader -->
+  <div id="loader-container" class="fixed inset-0 bg-white bg-opacity-80 flex flex-col justify-center items-center z-50">
+    <div class="loader"></div>
+    <p class="mt-4 text-lg font-semibold">Memuat dashboard...</p>
+  </div>
+
+  <!-- Modal konfirmasi -->
+  <div id="modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div class="bg-white p-6 rounded-lg shadow-xl max-w-md w-full mx-4">
+      <h3 id="modalTitle" class="text-xl font-bold mb-4"></h3>
+      <div id="modalContent"></div>
+      <div class="flex justify-end gap-2 mt-4">
+        <button id="modalCancel" class="px-4 py-2 bg-gray-300 hover:bg-gray-400 rounded-lg">Batal</button>
+        <button id="modalConfirm" class="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg">OK</button>
+      </div>
     </div>
+  </div>
 
-    <!-- Modal -->
-    <div id="modal" class="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 hidden">
-        <div class="bg-white p-6 rounded-lg shadow-xl max-w-md w-full mx-4">
-            <h3 id="modalTitle" class="text-xl font-bold mb-4"></h3>
-            <div id="modalContent"></div>
-            <div class="flex justify-end gap-2 mt-4">
-                <button id="modalCancel" class="px-4 py-2 bg-gray-300 hover:bg-gray-400 rounded-lg">Batal</button>
-                <button id="modalConfirm" class="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg">OK</button>
-            </div>
-        </div>
+  <!-- Header -->
+  <header class="bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg">
+    <div class="container mx-auto px-4 py-6 flex justify-between items-center">
+      <div>
+        <h1 class="text-3xl font-bold">Dashboard Admin</h1>
+        <p class="text-blue-100 text-sm mt-1">Sistem Manajemen Absensi Karyawan</p>
+      </div>
+      <div class="text-right">
+        <p class="text-sm text-blue-100">Admin</p>
+        <p class="text-lg font-semibold" id="currentDateTime">Loading...</p>
+      </div>
     </div>
+  </header>
 
-    <!-- Main Container -->
-    <div class="min-h-screen">
-        <!-- Header -->
-        <header class="bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg">
-            <div class="container mx-auto px-4 py-6">
-                <div class="flex justify-between items-center">
-                    <div>
-                        <h1 class="text-3xl font-bold">Dashboard Admin</h1>
-                        <p class="text-blue-100 mt-1">Sistem Manajemen Absensi Karyawan</p>
-                    </div>
-                    <div class="text-right">
-                        <p class="text-sm text-blue-100">Admin</p>
-                        <p class="text-lg font-semibold" id="currentDateTime">Loading...</p>
-                    </div>
-                </div>
-            </div>
-        </header>
-
-        <!-- Navigation Tabs -->
-        <div class="bg-white shadow-md sticky top-0 z-10">
-            <div class="container mx-auto px-4">
-                <div class="flex gap-1 overflow-x-auto">
-                    <button class="tab px-6 py-3 font-semibold rounded-t-lg transition tab-active" data-tab="overview">
-                        📊 Overview
-                    </button>
-                    <button class="tab px-6 py-3 font-semibold rounded-t-lg transition hover:bg-gray-100" data-tab="employees">
-                        👥 Karyawan
-                    </button>
-                    <button class="tab px-6 py-3 font-semibold rounded-t-lg transition hover:bg-gray-100" data-tab="attendance">
-                        📋 Data Absensi
-                    </button>
-                    <button class="tab px-6 py-3 font-semibold rounded-t-lg transition hover:bg-gray-100" data-tab="reports">
-                        📈 Laporan
-                    </button>
-                </div>
-            </div>
-        </div>
+  <!-- Navigasi -->
+  <div class="bg-white shadow-md sticky top-0 z-10">
+    <div class="container mx-auto px-4 flex gap-1 overflow-x-auto">
+      <button class="tab px-6 py-3 rounded-t-lg tab-active" data-tab="overview">📊 Overview</button>
+      <button class="tab px-6 py-3 rounded-t-lg hover:bg-gray-100" data-tab="employees">👥 Karyawan</button>
+      <button class="tab px-6 py-3 rounded-t-lg hover:bg-gray-100" data-tab="attendance">📋 Data Absensi</button>
+      <button class="tab px-6 py-3 rounded-t-lg hover:bg-gray-100" data-tab="reports">📈 Laporan</button>
+    </div>
+  </div>
 
         <!-- Content -->
         <div class="container mx-auto px-4 py-8">
@@ -1058,4 +1048,5 @@
         initialize();
     </script>
 </body>
+
 </html>
