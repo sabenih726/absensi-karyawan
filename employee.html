@@ -598,10 +598,10 @@
             const location = locationManager.currentLocation;
 
             // Save attendance
-            storage.addAttendance({
-                name: currentUser,
-                type: type,
-                location: location
+            await storage.addAttendance({
+              name: currentUser,
+              type: type,
+              location: locationManager.currentLocation
             });
 
             // Show success
@@ -697,5 +697,6 @@
 
 </body>
 </html>
+
 
 
