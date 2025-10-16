@@ -1,6 +1,6 @@
 // ===================================
-// storage-firebase.js - FIXED VERSION
-// Convert nested arrays to Firestore-compatible format
+// storage-firebase.js - FIRESTORE FIX v2
+// Save descriptors as base64 string to avoid nested array issues
 // ===================================
 
 class FirebaseStorageManager {
@@ -19,33 +19,40 @@ class FirebaseStorageManager {
     }
 
     // ===================================
-    // HELPER: Convert descriptors for Firestore
+    // HELPER: Encode/Decode Descriptors
     // ===================================
     
     /**
-     * Convert array to Firestore-safe object
-     * Firestore doesn't support nested arrays, so we convert to objects
+     * Encode descriptor array to base64 string
+     * This avoids Firestore nested array limitation
      */
-    _descriptorToFirestore(descriptor) {
-        // Convert Float32Array or Array to plain object with numeric keys
-        const obj = {};
-        for (let i = 0; i < descriptor.length; i++) {
-            obj[i] = descriptor[i];
+    _encodeDescriptor(descriptor) {
+        try {
+            // Ensure it's a regular array
+            const arr = Array.isArray(descriptor) ? descriptor : Array.from(descriptor);
+            
+            // Convert to JSON string then base64
+            const jsonStr = JSON.stringify(arr);
+            return btoa(jsonStr);
+        } catch (error) {
+            console.error('Error encoding descriptor:', error);
+            throw error;
         }
-        return obj;
     }
 
     /**
-     * Convert Firestore object back to array
+     * Decode base64 string back to descriptor array
      */
-    _firestoreToDescriptor(firestoreObj) {
-        // Convert object with numeric keys back to array
-        const keys = Object.keys(firestoreObj).map(Number).sort((a, b) => a - b);
-        const arr = new Array(keys.length);
-        for (let i = 0; i < keys.length; i++) {
-            arr[i] = firestoreObj[keys[i]];
+    _decodeDescriptor(encoded) {
+        try {
+            // Decode base64 to JSON string
+            const jsonStr = atob(encoded);
+            // Parse to array
+            return JSON.parse(jsonStr);
+        } catch (error) {
+            console.error('Error decoding descriptor:', error);
+            throw error;
         }
-        return arr;
     }
 
     // ===================================
@@ -61,17 +68,16 @@ class FirebaseStorageManager {
             const users = qs.docs.map(d => {
                 const data = d.data();
                 
-                // Convert descriptors back to arrays
+                // Decode descriptors from base64 strings
                 let descriptors = [];
-                if (data.descriptors && Array.isArray(data.descriptors)) {
-                    descriptors = data.descriptors.map(desc => {
-                        // If it's already an object (from Firestore), convert to array
-                        if (typeof desc === 'object' && !Array.isArray(desc)) {
-                            return this._firestoreToDescriptor(desc);
-                        }
-                        // If it's already an array (shouldn't happen but handle it)
-                        return desc;
-                    });
+                if (data.descriptors_encoded && Array.isArray(data.descriptors_encoded)) {
+                    descriptors = data.descriptors_encoded.map(encoded => 
+                        this._decodeDescriptor(encoded)
+                    );
+                }
+                // Fallback for old format (if any)
+                else if (data.descriptors) {
+                    descriptors = data.descriptors;
                 }
                 
                 return {
@@ -99,25 +105,26 @@ class FirebaseStorageManager {
                 throw new Error("Data user tidak lengkap (label dan descriptors diperlukan)");
             }
 
-            // Convert descriptors to Firestore-safe format
-            const firestoreDescriptors = data.descriptors.map(desc => {
+            // Validate and encode descriptors
+            const encodedDescriptors = data.descriptors.map(desc => {
                 // Ensure it's an array
                 const arr = Array.isArray(desc) ? desc : Array.from(desc);
                 
-                // Validate length
+                // Validate length (face-api descriptors should be 128 length)
                 if (arr.length !== 128) {
-                    throw new Error(`Invalid descriptor length: ${arr.length} (expected 128)`);
+                    console.warn(`Descriptor length is ${arr.length}, expected 128`);
                 }
                 
-                // Convert to Firestore-safe object
-                return this._descriptorToFirestore(arr);
+                // Encode to base64 string
+                return this._encodeDescriptor(arr);
             });
 
-            console.log('📝 Saving user with', firestoreDescriptors.length, 'descriptors');
+            console.log(`📝 Saving user with ${encodedDescriptors.length} encoded descriptor(s)`);
 
             const docRef = await window.firebaseDB.addDoc(this.usersCol, {
                 label: data.label,
-                descriptors: firestoreDescriptors,
+                descriptors_encoded: encodedDescriptors, // Array of strings (Firestore OK!)
+                descriptorCount: encodedDescriptors.length,
                 createdAt: window.firebaseDB.serverTimestamp()
             });
 
@@ -200,7 +207,6 @@ class FirebaseStorageManager {
      */
     async getTodayAttendance(name = null) {
         try {
-            // Get all attendance and filter locally (easier than complex Firestore queries)
             const all = await this.getAttendance();
             const today = new Date().toDateString();
             
@@ -405,9 +411,34 @@ class FirebaseStorageManager {
             return null;
         }
     }
+
+    /**
+     * Clear all test data (development only)
+     */
+    async clearTestData() {
+        try {
+            const users = await this.getUsers();
+            const testUsers = users.filter(u => 
+                u.label.includes('TEST') || 
+                u.label.includes('_INIT_') || 
+                u.label.includes('test')
+            );
+
+            for (const user of testUsers) {
+                await this.deleteUser(user.id);
+                console.log(`🗑️ Deleted test user: ${user.label}`);
+            }
+
+            console.log(`✅ Cleared ${testUsers.length} test users`);
+            return testUsers.length;
+        } catch (error) {
+            console.error("❌ Error clearing test data:", error);
+            throw error;
+        }
+    }
 }
 
 // Export ke window object
 window.FirebaseStorageManager = FirebaseStorageManager;
 
-console.log("✅ storage-firebase.js loaded successfully (Firestore-compatible version)");
+console.log("✅ storage-firebase.js loaded successfully (Base64 encoding version)");
