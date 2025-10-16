@@ -363,7 +363,9 @@
         // ===================================
         // INITIALIZE MANAGERS
         // ===================================
-        const storage = new StorageManager();
+        let storage;
+        window.addEventListener("load", () => { 
+           storage = new FirebaseStorageManager();
         const voiceManager = new VoiceManager();
         const locationManager = new LocationManager();
 
@@ -695,4 +697,5 @@
 
 </body>
 </html>
+
 
