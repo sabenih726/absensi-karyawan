@@ -1,6 +1,6 @@
 // ===================================
-// storage-firebase.js - FIRESTORE FIX v2
-// Save descriptors as base64 string to avoid nested array issues
+// storage-firebase.js - FINAL FIX
+// Store descriptor as a single flat object (no arrays at all)
 // ===================================
 
 class FirebaseStorageManager {
@@ -19,40 +19,31 @@ class FirebaseStorageManager {
     }
 
     // ===================================
-    // HELPER: Encode/Decode Descriptors
+    // HELPER: Convert Descriptors
     // ===================================
     
     /**
-     * Encode descriptor array to base64 string
-     * This avoids Firestore nested array limitation
+     * Convert array to flat object with numeric keys
+     * Example: [0.1, 0.2, 0.3] => {0: 0.1, 1: 0.2, 2: 0.3}
      */
-    _encodeDescriptor(descriptor) {
-        try {
-            // Ensure it's a regular array
-            const arr = Array.isArray(descriptor) ? descriptor : Array.from(descriptor);
-            
-            // Convert to JSON string then base64
-            const jsonStr = JSON.stringify(arr);
-            return btoa(jsonStr);
-        } catch (error) {
-            console.error('Error encoding descriptor:', error);
-            throw error;
+    _arrayToObject(arr) {
+        const obj = {};
+        for (let i = 0; i < arr.length; i++) {
+            obj[`d${i}`] = Number(arr[i]); // Use d0, d1, d2... as keys
         }
+        return obj;
     }
 
     /**
-     * Decode base64 string back to descriptor array
+     * Convert flat object back to array
+     * Example: {0: 0.1, 1: 0.2, 2: 0.3} => [0.1, 0.2, 0.3]
      */
-    _decodeDescriptor(encoded) {
-        try {
-            // Decode base64 to JSON string
-            const jsonStr = atob(encoded);
-            // Parse to array
-            return JSON.parse(jsonStr);
-        } catch (error) {
-            console.error('Error decoding descriptor:', error);
-            throw error;
+    _objectToArray(obj) {
+        const arr = [];
+        for (let i = 0; i < 128; i++) { // Face descriptors are always 128 length
+            arr.push(obj[`d${i}`] || 0);
         }
+        return arr;
     }
 
     // ===================================
@@ -68,22 +59,13 @@ class FirebaseStorageManager {
             const users = qs.docs.map(d => {
                 const data = d.data();
                 
-                // Decode descriptors from base64 strings
-                let descriptors = [];
-                if (data.descriptors_encoded && Array.isArray(data.descriptors_encoded)) {
-                    descriptors = data.descriptors_encoded.map(encoded => 
-                        this._decodeDescriptor(encoded)
-                    );
-                }
-                // Fallback for old format (if any)
-                else if (data.descriptors) {
-                    descriptors = data.descriptors;
-                }
+                // Convert descriptor object back to array
+                const descriptor = data.descriptor ? this._objectToArray(data.descriptor) : [];
                 
                 return {
                     id: d.id,
                     label: data.label,
-                    descriptors: descriptors,
+                    descriptors: [descriptor], // Wrap in array for compatibility
                     createdAt: data.createdAt ? this._timestampToDate(data.createdAt) : null
                 };
             });
@@ -105,26 +87,26 @@ class FirebaseStorageManager {
                 throw new Error("Data user tidak lengkap (label dan descriptors diperlukan)");
             }
 
-            // Validate and encode descriptors
-            const encodedDescriptors = data.descriptors.map(desc => {
-                // Ensure it's an array
-                const arr = Array.isArray(desc) ? desc : Array.from(desc);
-                
-                // Validate length (face-api descriptors should be 128 length)
-                if (arr.length !== 128) {
-                    console.warn(`Descriptor length is ${arr.length}, expected 128`);
-                }
-                
-                // Encode to base64 string
-                return this._encodeDescriptor(arr);
-            });
+            // Get first descriptor (we only need one per user)
+            const descriptor = data.descriptors[0];
+            
+            // Ensure it's an array
+            const arr = Array.isArray(descriptor) ? descriptor : Array.from(descriptor);
+            
+            // Validate length
+            if (arr.length !== 128) {
+                throw new Error(`Invalid descriptor length: ${arr.length} (expected 128)`);
+            }
 
-            console.log(`📝 Saving user with ${encodedDescriptors.length} encoded descriptor(s)`);
+            // Convert to flat object (NO ARRAYS!)
+            const descriptorObj = this._arrayToObject(arr);
 
+            console.log(`📝 Saving user ${data.label} with descriptor object`);
+
+            // Save to Firestore - NO NESTED ARRAYS!
             const docRef = await window.firebaseDB.addDoc(this.usersCol, {
                 label: data.label,
-                descriptors_encoded: encodedDescriptors, // Array of strings (Firestore OK!)
-                descriptorCount: encodedDescriptors.length,
+                descriptor: descriptorObj, // Single object with d0, d1, d2...d127 keys
                 createdAt: window.firebaseDB.serverTimestamp()
             });
 
@@ -154,13 +136,10 @@ class FirebaseStorageManager {
     // ATTENDANCE / Absensi
     // ===================================
 
-    /**
-     * Menambahkan record absensi
-     */
     async addAttendance(record) {
         try {
             if (!record.name || !record.type) {
-                throw new Error("Data absensi tidak lengkap (name dan type diperlukan)");
+                throw new Error("Data absensi tidak lengkap");
             }
 
             const docRef = await window.firebaseDB.addDoc(this.attCol, {
@@ -170,7 +149,7 @@ class FirebaseStorageManager {
                 timestamp: window.firebaseDB.serverTimestamp()
             });
 
-            console.log(`✅ Attendance recorded for ${record.name} (${record.type}): ${docRef.id}`);
+            console.log(`✅ Attendance recorded: ${docRef.id}`);
             return docRef.id;
         } catch (error) {
             console.error("❌ Error adding attendance:", error);
@@ -178,9 +157,6 @@ class FirebaseStorageManager {
         }
     }
 
-    /**
-     * Mengambil semua record absensi
-     */
     async getAttendance() {
         try {
             const qs = await window.firebaseDB.getDocs(this.attCol);
@@ -202,9 +178,6 @@ class FirebaseStorageManager {
         }
     }
 
-    /**
-     * Mengambil absensi hari ini
-     */
     async getTodayAttendance(name = null) {
         try {
             const all = await this.getAttendance();
@@ -219,7 +192,6 @@ class FirebaseStorageManager {
                 filtered = filtered.filter(a => a.name === name);
             }
 
-            console.log(`📦 Today's attendance for ${name || 'all'}: ${filtered.length} records`);
             return filtered;
         } catch (error) {
             console.error("❌ Error getting today's attendance:", error);
@@ -227,9 +199,6 @@ class FirebaseStorageManager {
         }
     }
 
-    /**
-     * Mengambil absensi berdasarkan rentang tanggal
-     */
     async getAttendanceByDateRange(startDate, endDate, name = null) {
         try {
             const all = await this.getAttendance();
@@ -254,9 +223,6 @@ class FirebaseStorageManager {
     // EMPLOYEES / Data Karyawan
     // ===================================
 
-    /**
-     * Menyimpan data karyawan
-     */
     async saveEmployee(emp) {
         try {
             if (!emp.name) {
@@ -271,7 +237,7 @@ class FirebaseStorageManager {
                 createdAt: window.firebaseDB.serverTimestamp()
             });
 
-            console.log(`✅ Employee ${emp.name} saved with ID: ${docRef.id}`);
+            console.log(`✅ Employee ${emp.name} saved: ${docRef.id}`);
             return docRef.id;
         } catch (error) {
             console.error("❌ Error saving employee:", error);
@@ -279,9 +245,6 @@ class FirebaseStorageManager {
         }
     }
 
-    /**
-     * Mengambil semua data karyawan
-     */
     async getEmployees() {
         try {
             const qs = await window.firebaseDB.getDocs(this.employeesCol);
@@ -304,9 +267,6 @@ class FirebaseStorageManager {
         }
     }
 
-    /**
-     * Mengambil karyawan berdasarkan ID
-     */
     async getEmployeeById(empId) {
         try {
             const docRef = window.firebaseDB.doc(this.db, "employees", empId);
@@ -316,10 +276,7 @@ class FirebaseStorageManager {
                 const data = docSnap.data();
                 return {
                     id: docSnap.id,
-                    name: data.name,
-                    employeeId: data.id,
-                    email: data.email,
-                    department: data.department,
+                    ...data,
                     createdAt: data.createdAt ? this._timestampToDate(data.createdAt) : null
                 };
             }
@@ -330,9 +287,6 @@ class FirebaseStorageManager {
         }
     }
 
-    /**
-     * Update data karyawan
-     */
     async updateEmployee(empId, data) {
         try {
             const docRef = window.firebaseDB.doc(this.db, "employees", empId);
@@ -347,9 +301,6 @@ class FirebaseStorageManager {
         }
     }
 
-    /**
-     * Hapus data karyawan
-     */
     async deleteEmployee(empId) {
         try {
             const docRef = window.firebaseDB.doc(this.db, "employees", empId);
@@ -365,28 +316,18 @@ class FirebaseStorageManager {
     // UTILITY METHODS
     // ===================================
 
-    /**
-     * Konversi Firestore Timestamp ke JavaScript Date
-     */
     _timestampToDate(timestamp) {
         if (!timestamp) return new Date();
-        
         if (timestamp instanceof Date) return timestamp;
-        
         if (timestamp.toDate && typeof timestamp.toDate === 'function') {
             return timestamp.toDate();
         }
-        
         if (timestamp.seconds) {
             return new Date(timestamp.seconds * 1000);
         }
-        
         return new Date(timestamp);
     }
 
-    /**
-     * Get statistics
-     */
     async getStatistics() {
         try {
             const [users, attendance, employees] = await Promise.all([
@@ -411,34 +352,7 @@ class FirebaseStorageManager {
             return null;
         }
     }
-
-    /**
-     * Clear all test data (development only)
-     */
-    async clearTestData() {
-        try {
-            const users = await this.getUsers();
-            const testUsers = users.filter(u => 
-                u.label.includes('TEST') || 
-                u.label.includes('_INIT_') || 
-                u.label.includes('test')
-            );
-
-            for (const user of testUsers) {
-                await this.deleteUser(user.id);
-                console.log(`🗑️ Deleted test user: ${user.label}`);
-            }
-
-            console.log(`✅ Cleared ${testUsers.length} test users`);
-            return testUsers.length;
-        } catch (error) {
-            console.error("❌ Error clearing test data:", error);
-            throw error;
-        }
-    }
 }
 
-// Export ke window object
 window.FirebaseStorageManager = FirebaseStorageManager;
-
-console.log("✅ storage-firebase.js loaded successfully (Base64 encoding version)");
+console.log("✅ storage-firebase.js loaded (flat object version - NO ARRAYS!)");
