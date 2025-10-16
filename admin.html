@@ -1,0 +1,1061 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Admin - Sistem Absensi</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+    <style>
+        .loader {
+            border: 8px solid #f3f3f3;
+            border-radius: 50%;
+            border-top: 8px solid #3498db;
+            width: 60px;
+            height: 60px;
+            animation: spin 2s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .tab-active {
+            background: linear-gradient(to right, #3b82f6, #6366f1);
+            color: white;
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+
+    <!-- Loader -->
+    <div id="loader-container" class="fixed inset-0 bg-white bg-opacity-90 flex flex-col justify-center items-center z-50">
+        <div class="loader"></div>
+        <p class="mt-4 text-lg font-semibold">Memuat dashboard...</p>
+    </div>
+
+    <!-- Modal -->
+    <div id="modal" class="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 hidden">
+        <div class="bg-white p-6 rounded-lg shadow-xl max-w-md w-full mx-4">
+            <h3 id="modalTitle" class="text-xl font-bold mb-4"></h3>
+            <div id="modalContent"></div>
+            <div class="flex justify-end gap-2 mt-4">
+                <button id="modalCancel" class="px-4 py-2 bg-gray-300 hover:bg-gray-400 rounded-lg">Batal</button>
+                <button id="modalConfirm" class="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Container -->
+    <div class="min-h-screen">
+        <!-- Header -->
+        <header class="bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg">
+            <div class="container mx-auto px-4 py-6">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <h1 class="text-3xl font-bold">Dashboard Admin</h1>
+                        <p class="text-blue-100 mt-1">Sistem Manajemen Absensi Karyawan</p>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-sm text-blue-100">Admin</p>
+                        <p class="text-lg font-semibold" id="currentDateTime">Loading...</p>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Navigation Tabs -->
+        <div class="bg-white shadow-md sticky top-0 z-10">
+            <div class="container mx-auto px-4">
+                <div class="flex gap-1 overflow-x-auto">
+                    <button class="tab px-6 py-3 font-semibold rounded-t-lg transition tab-active" data-tab="overview">
+                        📊 Overview
+                    </button>
+                    <button class="tab px-6 py-3 font-semibold rounded-t-lg transition hover:bg-gray-100" data-tab="employees">
+                        👥 Karyawan
+                    </button>
+                    <button class="tab px-6 py-3 font-semibold rounded-t-lg transition hover:bg-gray-100" data-tab="attendance">
+                        📋 Data Absensi
+                    </button>
+                    <button class="tab px-6 py-3 font-semibold rounded-t-lg transition hover:bg-gray-100" data-tab="reports">
+                        📈 Laporan
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Content -->
+        <div class="container mx-auto px-4 py-8">
+            
+            <!-- Overview Tab -->
+            <div id="overview" class="tab-content">
+                <!-- Statistics Cards -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                    <div class="bg-white rounded-xl shadow-md p-6">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-gray-500 text-sm">Total Karyawan</p>
+                                <p class="text-3xl font-bold text-gray-800" id="totalEmployees">0</p>
+                            </div>
+                            <span class="text-4xl">👥</span>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-white rounded-xl shadow-md p-6">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-gray-500 text-sm">Hadir Hari Ini</p>
+                                <p class="text-3xl font-bold text-green-600" id="presentToday">0</p>
+                            </div>
+                            <span class="text-4xl">✅</span>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-white rounded-xl shadow-md p-6">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-gray-500 text-sm">Terlambat</p>
+                                <p class="text-3xl font-bold text-yellow-600" id="lateToday">0</p>
+                            </div>
+                            <span class="text-4xl">⏰</span>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-white rounded-xl shadow-md p-6">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-gray-500 text-sm">Tidak Hadir</p>
+                                <p class="text-3xl font-bold text-red-600" id="absentToday">0</p>
+                            </div>
+                            <span class="text-4xl">❌</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Charts -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div class="bg-white rounded-xl shadow-md p-6">
+                        <h3 class="text-xl font-bold mb-4">Statistik Mingguan</h3>
+                        <canvas id="weeklyChart"></canvas>
+                    </div>
+                    
+                    <div class="bg-white rounded-xl shadow-md p-6">
+                        <h3 class="text-xl font-bold mb-4">Kehadiran Bulanan</h3>
+                        <canvas id="monthlyChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Employees Tab -->
+            <div id="employees" class="tab-content hidden">
+                <div class="bg-white rounded-xl shadow-md p-6">
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-2xl font-bold">Manajemen Karyawan</h2>
+                        <button id="addEmployeeBtn" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg">
+                            ➕ Tambah Karyawan
+                        </button>
+                    </div>
+
+                    <!-- Add Employee Form (Hidden by default) -->
+                    <div id="addEmployeeForm" class="hidden mb-6 p-4 bg-gray-50 rounded-lg">
+                        <h3 class="font-semibold mb-3">Registrasi Karyawan Baru</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <input type="text" id="empName" placeholder="Nama Lengkap" class="px-4 py-2 border rounded-lg">
+                            <input type="text" id="empId" placeholder="ID Karyawan" class="px-4 py-2 border rounded-lg">
+                            <input type="email" id="empEmail" placeholder="Email" class="px-4 py-2 border rounded-lg">
+                            <input type="text" id="empDept" placeholder="Departemen" class="px-4 py-2 border rounded-lg">
+                        </div>
+                        <div class="mt-4 flex gap-2">
+                            <button id="capturePhotoBtn" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg">
+                                📸 Ambil Foto Wajah
+                            </button>
+                            <button id="saveEmployeeBtn" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg">
+                                💾 Simpan
+                            </button>
+                            <button id="cancelAddBtn" class="bg-gray-400 hover:bg-gray-500 text-white px-4 py-2 rounded-lg">
+                                ❌ Batal
+                            </button>
+                        </div>
+                        <!-- Hidden video for face capture -->
+                        <video id="captureVideo" class="hidden" width="320" height="240" autoplay></video>
+                    </div>
+
+                    <!-- Employee List -->
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-4 py-3 text-left">Nama</th>
+                                    <th class="px-4 py-3 text-left">ID</th>
+                                    <th class="px-4 py-3 text-left">Departemen</th>
+                                    <th class="px-4 py-3 text-left">Email</th>
+                                    <th class="px-4 py-3 text-left">Terdaftar</th>
+                                    <th class="px-4 py-3 text-center">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody id="employeeList">
+                                <tr><td colspan="6" class="text-center py-4 text-gray-500">Memuat data...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Attendance Tab -->
+            <div id="attendance" class="tab-content hidden">
+                <div class="bg-white rounded-xl shadow-md p-6">
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-2xl font-bold">Data Absensi</h2>
+                        <div class="flex gap-2">
+                            <input type="date" id="filterDate" class="px-4 py-2 border rounded-lg">
+                            <select id="filterType" class="px-4 py-2 border rounded-lg">
+                                <option value="all">Semua</option>
+                                <option value="check-in">Masuk</option>
+                                <option value="check-out">Pulang</option>
+                            </select>
+                            <button id="filterBtn" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg">
+                                🔍 Filter
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-4 py-3 text-left">Tanggal</th>
+                                    <th class="px-4 py-3 text-left">Nama</th>
+                                    <th class="px-4 py-3 text-left">Tipe</th>
+                                    <th class="px-4 py-3 text-left">Waktu</th>
+                                    <th class="px-4 py-3 text-left">Lokasi</th>
+                                    <th class="px-4 py-3 text-center">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="attendanceList">
+                                <tr><td colspan="6" class="text-center py-4 text-gray-500">Memuat data...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Reports Tab -->
+            <div id="reports" class="tab-content hidden">
+                <div class="bg-white rounded-xl shadow-md p-6">
+                    <h2 class="text-2xl font-bold mb-6">Laporan Absensi</h2>
+                    
+                    <!-- Report Filters -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                        <div>
+                            <label class="block text-sm font-medium mb-2">Periode</label>
+                            <select id="reportPeriod" class="w-full px-4 py-2 border rounded-lg">
+                                <option value="daily">Harian</option>
+                                <option value="weekly">Mingguan</option>
+                                <option value="monthly">Bulanan</option>
+                                <option value="custom">Custom</option>
+                            </select>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium mb-2">Dari Tanggal</label>
+                            <input type="date" id="reportStartDate" class="w-full px-4 py-2 border rounded-lg">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium mb-2">Sampai Tanggal</label>
+                            <input type="date" id="reportEndDate" class="w-full px-4 py-2 border rounded-lg">
+                        </div>
+                    </div>
+
+                    <!-- Export Buttons -->
+                    <div class="flex gap-3 mb-6">
+                        <button id="generateReportBtn" class="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2 rounded-lg">
+                            📊 Generate Laporan
+                        </button>
+                        <button id="exportExcelBtn" class="bg-green-500 hover:bg-green-600 text-white px-6 py-2 rounded-lg">
+                            📥 Export Excel
+                        </button>
+                        <button id="exportPdfBtn" class="bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded-lg">
+                            📄 Export PDF
+                        </button>
+                    </div>
+
+                    <!-- Report Summary -->
+                    <div id="reportSummary" class="hidden">
+                        <h3 class="text-lg font-bold mb-4">Ringkasan Laporan</h3>
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                            <div class="bg-blue-50 p-4 rounded-lg">
+                                <p class="text-sm text-gray-600">Total Hari Kerja</p>
+                                <p class="text-2xl font-bold" id="totalWorkDays">0</p>
+                            </div>
+                            <div class="bg-green-50 p-4 rounded-lg">
+                                <p class="text-sm text-gray-600">Rata-rata Kehadiran</p>
+                                <p class="text-2xl font-bold" id="avgAttendance">0%</p>
+                            </div>
+                            <div class="bg-yellow-50 p-4 rounded-lg">
+                                <p class="text-sm text-gray-600">Total Keterlambatan</p>
+                                <p class="text-2xl font-bold" id="totalLate">0</p>
+                            </div>
+                            <div class="bg-red-50 p-4 rounded-lg">
+                                <p class="text-sm text-gray-600">Total Absen</p>
+                                <p class="text-2xl font-bold" id="totalAbsent">0</p>
+                            </div>
+                        </div>
+
+                        <!-- Report Table -->
+                        <div class="overflow-x-auto">
+                            <table class="w-full" id="reportTable">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-4 py-3 text-left">Nama</th>
+                                        <th class="px-4 py-3 text-center">Hadir</th>
+                                        <th class="px-4 py-3 text-center">Terlambat</th>
+                                        <th class="px-4 py-3 text-center">Absen</th>
+                                        <th class="px-4 py-3 text-center">% Kehadiran</th>
+                                        <th class="px-4 py-3 text-center">Total Jam</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="reportTableBody">
+                                    <!-- Filled dynamically -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // === STORAGE MANAGER ===
+        class StorageManager {
+            constructor() {
+                this.USERS_KEY = 'faceRecognition_users';
+                this.ATTENDANCE_KEY = 'faceRecognition_attendance';
+                this.EMPLOYEES_KEY = 'employee_data';
+            }
+
+            getUsers() {
+                const data = localStorage.getItem(this.USERS_KEY);
+                return data ? JSON.parse(data) : [];
+            }
+
+            saveUsers(users) {
+                localStorage.setItem(this.USERS_KEY, JSON.stringify(users));
+            }
+
+            getEmployees() {
+                const data = localStorage.getItem(this.EMPLOYEES_KEY);
+                return data ? JSON.parse(data) : [];
+            }
+
+            saveEmployees(employees) {
+                localStorage.setItem(this.EMPLOYEES_KEY, JSON.stringify(employees));
+            }
+
+            getAttendance() {
+                const data = localStorage.getItem(this.ATTENDANCE_KEY);
+                return data ? JSON.parse(data) : [];
+            }
+
+            deleteUser(userId) {
+                const users = this.getUsers().filter(u => u.id !== userId);
+                this.saveUsers(users);
+            }
+        }
+
+        const storage = new StorageManager();
+
+        // === DOM Elements ===
+        const loaderContainer = document.getElementById('loader-container');
+        const modal = document.getElementById('modal');
+        const modalTitle = document.getElementById('modalTitle');
+        const modalContent = document.getElementById('modalContent');
+        const modalCancel = document.getElementById('modalCancel');
+        const modalConfirm = document.getElementById('modalConfirm');
+        const currentDateTime = document.getElementById('currentDateTime');
+
+        // === Update DateTime ===
+        setInterval(() => {
+            currentDateTime.textContent = new Date().toLocaleString('id-ID');
+        }, 1000);
+
+        // === Tab Navigation ===
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                const tabName = tab.dataset.tab;
+                
+                // Update active tab
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('tab-active'));
+                tab.classList.add('tab-active');
+                
+                // Show corresponding content
+                document.querySelectorAll('.tab-content').forEach(content => {
+                    content.classList.add('hidden');
+                });
+                document.getElementById(tabName).classList.remove('hidden');
+                
+                // Load data for specific tabs
+                if (tabName === 'overview') loadOverview();
+                if (tabName === 'employees') loadEmployees();
+                if (tabName === 'attendance') loadAttendance();
+            });
+        });
+
+        // === Load Overview ===
+        function loadOverview() {
+            const users = storage.getUsers();
+            const attendance = storage.getAttendance();
+            const today = new Date().toDateString();
+            const todayAttendance = attendance.filter(a => new Date(a.timestamp).toDateString() === today);
+            
+            // Update statistics
+            document.getElementById('totalEmployees').textContent = users.length;
+            
+            const checkIns = todayAttendance.filter(a => a.type === 'check-in');
+            document.getElementById('presentToday').textContent = checkIns.length;
+            
+            // Calculate late (after 09:00)
+            const late = checkIns.filter(a => {
+                const time = new Date(a.timestamp);
+                return time.getHours() > 9 || (time.getHours() === 9 && time.getMinutes() > 0);
+            });
+            document.getElementById('lateToday').textContent = late.length;
+            
+            const absent = users.length - checkIns.length;
+            document.getElementById('absentToday').textContent = absent;
+
+            // Create charts
+            createWeeklyChart();
+            createMonthlyChart();
+        }
+
+        // === Create Weekly Chart ===
+        function createWeeklyChart() {
+            const ctx = document.getElementById('weeklyChart').getContext('2d');
+            const attendance = storage.getAttendance();
+            
+            // Get last 7 days
+            const days = [];
+            const data = [];
+            for (let i = 6; i >= 0; i--) {
+                const date = new Date();
+                date.setDate(date.getDate() - i);
+                days.push(date.toLocaleDateString('id-ID', { weekday: 'short' }));
+                
+                const dayAttendance = attendance.filter(a => 
+                    new Date(a.timestamp).toDateString() === date.toDateString() && 
+                    a.type === 'check-in'
+                );
+                data.push(dayAttendance.length);
+            }
+
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: days,
+                    datasets: [{
+                        label: 'Kehadiran',
+                        data: data,
+                        borderColor: 'rgb(59, 130, 246)',
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { display: false }
+                    }
+                }
+            });
+        }
+
+        // === Create Monthly Chart ===
+        function createMonthlyChart() {
+            const ctx = document.getElementById('monthlyChart').getContext('2d');
+            const attendance = storage.getAttendance();
+            const users = storage.getUsers();
+            
+            const present = attendance.filter(a => {
+                const date = new Date(a.timestamp);
+                return date.getMonth() === new Date().getMonth() && a.type === 'check-in';
+            }).length;
+            
+            const workDays = 22; // Assumed
+            const absent = (users.length * workDays) - present;
+
+            new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Hadir', 'Absen'],
+                    datasets: [{
+                        data: [present, absent],
+                        backgroundColor: [
+                            'rgba(34, 197, 94, 0.8)',
+                            'rgba(239, 68, 68, 0.8)'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true
+                }
+            });
+        }
+
+        // === Load Employees ===
+        function loadEmployees() {
+            const users = storage.getUsers();
+            const employees = storage.getEmployees();
+            const employeeList = document.getElementById('employeeList');
+            
+            if (users.length === 0) {
+                employeeList.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-gray-500">Belum ada karyawan terdaftar</td></tr>';
+                return;
+            }
+
+            employeeList.innerHTML = users.map(user => {
+                const emp = employees.find(e => e.name === user.label) || {};
+                return `
+                    <tr class="border-b hover:bg-gray-50">
+                        <td class="px-4 py-3">${user.label}</td>
+                        <td class="px-4 py-3">${emp.id || '-'}</td>
+                        <td class="px-4 py-3">${emp.department || '-'}</td>
+                        <td class="px-4 py-3">${emp.email || '-'}</td>
+                        <td class="px-4 py-3">${new Date(user.id).toLocaleDateString('id-ID')}</td>
+                        <td class="px-4 py-3 text-center">
+                            <button onclick="deleteEmployee('${user.id}', '${user.label}')" class="text-red-500 hover:text-red-700">
+                                🗑️ Hapus
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        // === Load Attendance ===
+        function loadAttendance() {
+            const attendance = storage.getAttendance();
+            const attendanceList = document.getElementById('attendanceList');
+            
+            if (attendance.length === 0) {
+                attendanceList.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-gray-500">Belum ada data absensi</td></tr>';
+                return;
+            }
+
+            // Sort by date
+            attendance.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+            
+            attendanceList.innerHTML = attendance.slice(0, 100).map(record => {
+                const date = new Date(record.timestamp);
+                const time = date.toLocaleTimeString('id-ID');
+                const dateStr = date.toLocaleDateString('id-ID');
+                const type = record.type === 'check-in' ? 
+                    '<span class="text-green-600">Masuk</span>' : 
+                    '<span class="text-red-600">Pulang</span>';
+                
+                const location = record.location ? record.location.address : '-';
+                
+                // Check if late
+                let status = '<span class="text-green-600">✓ Tepat Waktu</span>';
+                if (record.type === 'check-in' && (date.getHours() > 9 || (date.getHours() === 9 && date.getMinutes() > 0))) {
+                    status = '<span class="text-yellow-600">⚠ Terlambat</span>';
+                }
+                
+                return `
+                    <tr class="border-b hover:bg-gray-50">
+                        <td class="px-4 py-3">${dateStr}</td>
+                        <td class="px-4 py-3">${record.name}</td>
+                        <td class="px-4 py-3">${type}</td>
+                        <td class="px-4 py-3">${time}</td>
+                        <td class="px-4 py-3 text-sm">${location}</td>
+                        <td class="px-4 py-3 text-center">${status}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        // === Delete Employee ===
+        function deleteEmployee(userId, name) {
+            modalTitle.textContent = 'Konfirmasi Hapus';
+            modalContent.innerHTML = `<p>Apakah Anda yakin ingin menghapus <strong>${name}</strong>?</p>`;
+            modal.classList.remove('hidden');
+            
+            modalConfirm.onclick = () => {
+                storage.deleteUser(userId);
+                loadEmployees();
+                modal.classList.add('hidden');
+            };
+        }
+
+        // === Employee Management ===
+        const addEmployeeBtn = document.getElementById('addEmployeeBtn');
+        const addEmployeeForm = document.getElementById('addEmployeeForm');
+        const captureVideo = document.getElementById('captureVideo');
+        const capturePhotoBtn = document.getElementById('capturePhotoBtn');
+        const saveEmployeeBtn = document.getElementById('saveEmployeeBtn');
+        const cancelAddBtn = document.getElementById('cancelAddBtn');
+
+        let tempFaceDescriptor = null;
+
+        addEmployeeBtn.addEventListener('click', () => {
+            addEmployeeForm.classList.toggle('hidden');
+            if (!addEmployeeForm.classList.contains('hidden')) {
+                startCaptureVideo();
+            }
+        });
+
+        cancelAddBtn.addEventListener('click', () => {
+            addEmployeeForm.classList.add('hidden');
+            stopCaptureVideo();
+        });
+
+        function startCaptureVideo() {
+            navigator.mediaDevices.getUserMedia({ video: {} })
+                .then(stream => {
+                    captureVideo.srcObject = stream;
+                    captureVideo.classList.remove('hidden');
+                });
+        }
+
+        function stopCaptureVideo() {
+            if (captureVideo.srcObject) {
+                captureVideo.srcObject.getTracks().forEach(track => track.stop());
+                captureVideo.classList.add('hidden');
+            }
+        }
+
+        capturePhotoBtn.addEventListener('click', async () => {
+            const detection = await faceapi.detectSingleFace(captureVideo, new faceapi.TinyFaceDetectorOptions())
+                .withFaceLandmarks()
+                .withFaceDescriptor();
+            
+            if (detection) {
+                tempFaceDescriptor = Array.from(detection.descriptor);
+                alert('✅ Wajah berhasil dideteksi!');
+            } else {
+                alert('❌ Wajah tidak terdeteksi. Coba lagi.');
+            }
+        });
+
+        saveEmployeeBtn.addEventListener('click', () => {
+            const name = document.getElementById('empName').value;
+            const id = document.getElementById('empId').value;
+            const email = document.getElementById('empEmail').value;
+            const dept = document.getElementById('empDept').value;
+            
+            if (!name || !tempFaceDescriptor) {
+                alert('Lengkapi data dan ambil foto wajah!');
+                return;
+            }
+
+            // Save to users (face recognition)
+            const users = storage.getUsers();
+            users.push({
+                id: Date.now().toString(),
+                label: name,
+                descriptors: [tempFaceDescriptor]
+            });
+            storage.saveUsers(users);
+
+            // Save employee details
+            const employees = storage.getEmployees();
+            employees.push({ name, id, email, department: dept });
+            storage.saveEmployees(employees);
+
+            // Reset form
+            document.getElementById('empName').value = '';
+            document.getElementById('empId').value = '';
+            document.getElementById('empEmail').value = '';
+            document.getElementById('empDept').value = '';
+            tempFaceDescriptor = null;
+            addEmployeeForm.classList.add('hidden');
+            stopCaptureVideo();
+            
+            loadEmployees();
+            alert('✅ Karyawan berhasil ditambahkan!');
+        });
+
+        // === Filter Attendance ===
+        document.getElementById('filterBtn').addEventListener('click', () => {
+            const date = document.getElementById('filterDate').value;
+            const type = document.getElementById('filterType').value;
+            
+            let attendance = storage.getAttendance();
+            
+            if (date) {
+                attendance = attendance.filter(a => 
+                    new Date(a.timestamp).toDateString() === new Date(date).toDateString()
+                );
+            }
+            
+            if (type !== 'all') {
+                attendance = attendance.filter(a => a.type === type);
+            }
+            
+            // Update table with filtered data
+            const attendanceList = document.getElementById('attendanceList');
+            if (attendance.length === 0) {
+                attendanceList.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-gray-500">Tidak ada data</td></tr>';
+                return;
+            }
+
+            attendanceList.innerHTML = attendance.map(record => {
+                const date = new Date(record.timestamp);
+                const time = date.toLocaleTimeString('id-ID');
+                const dateStr = date.toLocaleDateString('id-ID');
+                const type = record.type === 'check-in' ? 
+                    '<span class="text-green-600">Masuk</span>' : 
+                    '<span class="text-red-600">Pulang</span>';
+                const location = record.location ? record.location.address : '-';
+                let status = '<span class="text-green-600">✓ Tepat Waktu</span>';
+                if (record.type === 'check-in' && (date.getHours() > 9 || (date.getHours() === 9 && date.getMinutes() > 0))) {
+                    status = '<span class="text-yellow-600">⚠ Terlambat</span>';
+                }
+                
+                return `
+                    <tr class="border-b hover:bg-gray-50">
+                        <td class="px-4 py-3">${dateStr}</td>
+                        <td class="px-4 py-3">${record.name}</td>
+                        <td class="px-4 py-3">${type}</td>
+                        <td class="px-4 py-3">${time}</td>
+                        <td class="px-4 py-3 text-sm">${location}</td>
+                        <td class="px-4 py-3 text-center">${status}</td>
+                    </tr>
+                `;
+            }).join('');
+        });
+
+        // === Generate Report (FIXED VERSION) ===
+        function generateReport(period, startDate, endDate) {
+            const attendance = storage.getAttendance();
+            const users = storage.getUsers();
+            
+            // Determine date range based on period
+            let start = new Date();
+            let end = new Date();
+            
+            if (period === 'daily') {
+                start = new Date();
+                start.setHours(0, 0, 0, 0);
+                end = new Date();
+                end.setHours(23, 59, 59, 999);
+            } else if (period === 'weekly') {
+                // Get current week (Monday to Sunday)
+                const day = start.getDay();
+                const diff = start.getDate() - day + (day === 0 ? -6 : 1);
+                start = new Date(start.setDate(diff));
+                start.setHours(0, 0, 0, 0);
+                end = new Date(start);
+                end.setDate(end.getDate() + 6);
+                end.setHours(23, 59, 59, 999);
+            } else if (period === 'monthly') {
+                start = new Date(start.getFullYear(), start.getMonth(), 1);
+                end = new Date(start.getFullYear(), start.getMonth() + 1, 0);
+                end.setHours(23, 59, 59, 999);
+            } else if (period === 'custom' && startDate && endDate) {
+                start = new Date(startDate);
+                start.setHours(0, 0, 0, 0);
+                end = new Date(endDate);
+                end.setHours(23, 59, 59, 999);
+            }
+            
+            // Calculate actual work days (exclude weekends)
+            function getWorkDays(startDate, endDate) {
+                let count = 0;
+                let curDate = new Date(startDate);
+                while (curDate <= endDate) {
+                    const dayOfWeek = curDate.getDay();
+                    if (dayOfWeek !== 0 && dayOfWeek !== 6) count++;
+                    curDate.setDate(curDate.getDate() + 1);
+                }
+                return count;
+            }
+            
+            const actualWorkDays = getWorkDays(start, end);
+            
+            // Filter attendance by date range
+            const filtered = attendance.filter(a => {
+                const date = new Date(a.timestamp);
+                return date >= start && date <= end;
+            });
+            
+            // Get unique dates with check-ins
+            const workDatesWithAttendance = [...new Set(
+                filtered
+                    .filter(a => a.type === 'check-in')
+                    .map(a => new Date(a.timestamp).toDateString())
+            )];
+            
+            // Calculate statistics per user
+            const reportData = users.map(user => {
+                const userAttendance = filtered.filter(a => a.name === user.label);
+                const checkIns = userAttendance.filter(a => a.type === 'check-in');
+                const checkOuts = userAttendance.filter(a => a.type === 'check-out');
+                
+                // Get unique days where user checked in
+                const userWorkDays = [...new Set(
+                    checkIns.map(a => new Date(a.timestamp).toDateString())
+                )].length;
+                
+                // Count late check-ins (after 09:00)
+                const late = checkIns.filter(a => {
+                    const time = new Date(a.timestamp);
+                    return time.getHours() > 9 || (time.getHours() === 9 && time.getMinutes() > 0);
+                });
+                
+                // Calculate total work hours
+                let totalHours = 0;
+                const processedDates = new Set();
+                
+                checkIns.forEach(checkIn => {
+                    const checkInDate = new Date(checkIn.timestamp);
+                    const dateStr = checkInDate.toDateString();
+                    
+                    // Skip if we already processed this date
+                    if (processedDates.has(dateStr)) return;
+                    processedDates.add(dateStr);
+                    
+                    // Find corresponding check-out on the same day
+                    const checkOut = checkOuts.find(co => 
+                        new Date(co.timestamp).toDateString() === dateStr
+                    );
+                    
+                    if (checkOut) {
+                        const checkOutDate = new Date(checkOut.timestamp);
+                        const diff = checkOutDate - checkInDate;
+                        const hours = diff / (1000 * 60 * 60);
+                        totalHours += hours;
+                    } else {
+                        // If no check-out, assume 8 hours (or current time if today)
+                        if (dateStr === new Date().toDateString()) {
+                            const now = new Date();
+                            const diff = now - checkInDate;
+                            const hours = Math.min(diff / (1000 * 60 * 60), 9); // Max 9 hours
+                            totalHours += hours;
+                        } else {
+                            totalHours += 8; // Default 8 hours if no check-out
+                        }
+                    }
+                });
+                
+                // Calculate absent days (work days - present days)
+                const absentDays = Math.max(0, actualWorkDays - userWorkDays);
+                
+                // Calculate attendance rate
+                const attendanceRate = actualWorkDays > 0 ? 
+                    ((userWorkDays / actualWorkDays) * 100) : 0;
+                
+                return {
+                    name: user.label,
+                    present: userWorkDays,  // Count unique days, not total check-ins
+                    late: late.length,
+                    absent: absentDays,
+                    attendanceRate: attendanceRate.toFixed(1),
+                    totalHours: totalHours.toFixed(1),
+                    actualCheckIns: checkIns.length,  // For debugging
+                    actualCheckOuts: checkOuts.length
+                };
+            });
+            
+            // Update summary display
+            document.getElementById('reportSummary').classList.remove('hidden');
+            document.getElementById('totalWorkDays').textContent = actualWorkDays;
+            
+            const avgAttendance = reportData.length > 0 ?
+                (reportData.reduce((sum, r) => sum + parseFloat(r.attendanceRate), 0) / reportData.length).toFixed(1) : 0;
+            document.getElementById('avgAttendance').textContent = avgAttendance + '%';
+            
+            document.getElementById('totalLate').textContent = 
+                reportData.reduce((sum, r) => sum + r.late, 0);
+            document.getElementById('totalAbsent').textContent = 
+                reportData.reduce((sum, r) => sum + r.absent, 0);
+            
+            // Display report table
+            const reportTableBody = document.getElementById('reportTableBody');
+            reportTableBody.innerHTML = reportData.map(r => `
+                <tr class="border-b hover:bg-gray-50">
+                    <td class="px-4 py-3 font-medium">${r.name}</td>
+                    <td class="px-4 py-3 text-center text-green-600">${r.present}</td>
+                    <td class="px-4 py-3 text-center text-yellow-600">${r.late}</td>
+                    <td class="px-4 py-3 text-center text-red-600">${r.absent}</td>
+                    <td class="px-4 py-3 text-center font-medium">
+                        <span class="${parseFloat(r.attendanceRate) >= 80 ? 'text-green-600' : 'text-red-600'}">
+                            ${r.attendanceRate}%
+                        </span>
+                    </td>
+                    <td class="px-4 py-3 text-center">${r.totalHours} jam</td>
+                </tr>
+            `).join('');
+            
+            // Store for export
+            window.currentReportData = reportData;
+            window.reportPeriodInfo = {
+                startDate: start.toLocaleDateString('id-ID'),
+                endDate: end.toLocaleDateString('id-ID'),
+                workDays: actualWorkDays
+            };
+        }
+
+        // === Improved Excel Export ===
+        document.getElementById('exportExcelBtn').addEventListener('click', () => {
+            if (!window.currentReportData) {
+                alert('Generate laporan terlebih dahulu!');
+                return;
+            }
+            
+            const periodInfo = window.reportPeriodInfo || {};
+            
+            // Create worksheet data with better formatting
+            const ws_data = [
+                ['LAPORAN ABSENSI KARYAWAN'],
+                [],
+                ['Periode:', `${periodInfo.startDate} - ${periodInfo.endDate}`],
+                ['Total Hari Kerja:', periodInfo.workDays],
+                ['Tanggal Export:', new Date().toLocaleDateString('id-ID')],
+                [],
+                ['Nama Karyawan', 'Hari Hadir', 'Keterlambatan', 'Hari Absen', 'Persentase Kehadiran', 'Total Jam Kerja']
+            ];
+            
+            // Add data rows
+            window.currentReportData.forEach(r => {
+                ws_data.push([
+                    r.name, 
+                    r.present, 
+                    r.late, 
+                    r.absent, 
+                    r.attendanceRate + '%', 
+                    r.totalHours + ' jam'
+                ]);
+            });
+            
+            // Add summary row
+            ws_data.push([]);
+            ws_data.push(['RINGKASAN']);
+            ws_data.push([
+                'Total',
+                window.currentReportData.reduce((sum, r) => sum + r.present, 0),
+                window.currentReportData.reduce((sum, r) => sum + r.late, 0),
+                window.currentReportData.reduce((sum, r) => sum + r.absent, 0),
+                document.getElementById('avgAttendance').textContent,
+                window.currentReportData.reduce((sum, r) => sum + parseFloat(r.totalHours), 0).toFixed(1) + ' jam'
+            ]);
+            
+            // Create worksheet
+            const ws = XLSX.utils.aoa_to_sheet(ws_data);
+            
+            // Set column widths
+            ws['!cols'] = [
+                {wch: 25}, // Nama
+                {wch: 12}, // Hadir
+                {wch: 15}, // Terlambat
+                {wch: 12}, // Absen
+                {wch: 20}, // Persentase
+                {wch: 15}  // Total Jam
+            ];
+            
+            // Apply some basic styling (merge cells for title)
+            ws['!merges'] = [
+                {s: {r: 0, c: 0}, e: {r: 0, c: 5}} // Merge title row
+            ];
+            
+            // Create workbook and export
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Laporan Absensi");
+            
+            // Generate filename with period info
+            const filename = `Laporan_Absensi_${periodInfo.startDate.replace(/\//g, '-')}_to_${periodInfo.endDate.replace(/\//g, '-')}.xlsx`;
+            XLSX.writeFile(wb, filename);
+        });
+
+        // === Update Report Period Controls ===
+        document.getElementById('reportPeriod').addEventListener('change', function() {
+            const startDateInput = document.getElementById('reportStartDate');
+            const endDateInput = document.getElementById('reportEndDate');
+            
+            if (this.value === 'custom') {
+                startDateInput.disabled = false;
+                endDateInput.disabled = false;
+            } else {
+                startDateInput.disabled = true;
+                endDateInput.disabled = true;
+                
+                // Auto-fill dates based on selection
+                const today = new Date();
+                
+                if (this.value === 'daily') {
+                    startDateInput.value = today.toISOString().slice(0, 10);
+                    endDateInput.value = today.toISOString().slice(0, 10);
+                } else if (this.value === 'weekly') {
+                    const day = today.getDay();
+                    const diff = today.getDate() - day + (day === 0 ? -6 : 1);
+                    const monday = new Date(today.setDate(diff));
+                    const sunday = new Date(monday);
+                    sunday.setDate(sunday.getDate() + 6);
+                    
+                    startDateInput.value = monday.toISOString().slice(0, 10);
+                    endDateInput.value = sunday.toISOString().slice(0, 10);
+                } else if (this.value === 'monthly') {
+                    const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+                    const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+                    
+                    startDateInput.value = firstDay.toISOString().slice(0, 10);
+                    endDateInput.value = lastDay.toISOString().slice(0, 10);
+                }
+            }
+        });
+
+        // === Fix Generate Report Button ===
+        document.addEventListener('DOMContentLoaded', function() {
+            // Generate Report Button
+            const generateReportBtn = document.getElementById('generateReportBtn');
+            if (generateReportBtn) {
+                generateReportBtn.addEventListener('click', function() {
+                    const period = document.getElementById('reportPeriod').value;
+                    const startDate = document.getElementById('reportStartDate').value;
+                    const endDate = document.getElementById('reportEndDate').value;
+                    
+                    console.log('Generating report...', period, startDate, endDate);
+                    generateReport(period, startDate, endDate);
+                });
+            }
+
+            // Initialize date inputs with current month
+            const today = new Date();
+            const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+            const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+            
+            document.getElementById('reportStartDate').value = firstDay.toISOString().slice(0, 10);
+            document.getElementById('reportEndDate').value = lastDay.toISOString().slice(0, 10);
+            document.getElementById('reportStartDate').disabled = true;
+            document.getElementById('reportEndDate').disabled = true;
+        });
+
+        // === Modal Close ===
+        modalCancel.addEventListener('click', () => {
+            modal.classList.add('hidden');
+        });
+
+        // === Initialize ===
+        async function initialize() {
+            // Load face-api models
+            const MODEL_URL = 'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@0.22.2/weights';
+            try {
+                await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
+                await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
+                await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
+            } catch (error) {
+                console.error("Error loading models:", error);
+            }
+
+            loaderContainer.style.display = 'none';
+            loadOverview();
+        }
+
+        initialize();
+    </script>
+</body>
+</html>
