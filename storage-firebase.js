@@ -34,6 +34,42 @@ class FirebaseStorageManager {
   /**
    * Tambah user baru dengan face descriptor
    */
+// ============================================
+// 💾 storage-firebase.js - FIXED VERSION
+// Firebase Storage Manager untuk Attendance System
+// ============================================
+
+class FirebaseStorageManager {
+  constructor() {
+    if (!window.firebaseDB) {
+      throw new Error('Firebase not initialized. Make sure firebase-config.js is loaded first.');
+    }
+
+    this.db = window.firebaseDB.db;
+    this.collection = window.firebaseDB.collection;
+    this.doc = window.firebaseDB.doc;
+    this.addDoc = window.firebaseDB.addDoc;
+    this.getDoc = window.firebaseDB.getDoc;
+    this.getDocs = window.firebaseDB.getDocs;
+    this.setDoc = window.firebaseDB.setDoc;
+    this.updateDoc = window.firebaseDB.updateDoc;
+    this.deleteDoc = window.firebaseDB.deleteDoc;
+    this.query = window.firebaseDB.query;
+    this.where = window.firebaseDB.where;
+    this.orderBy = window.firebaseDB.orderBy;
+    this.serverTimestamp = window.firebaseDB.serverTimestamp;
+    this.onSnapshot = window.firebaseDB.onSnapshot;
+
+    console.log('✅ FirebaseStorageManager initialized');
+  }
+
+  // ==========================================
+  // 👥 USER MANAGEMENT - FIXED VERSION
+  // ==========================================
+
+  /**
+   * Add user dengan face descriptor - FIXED!
+   */
   async addUser(userData) {
     try {
       const { label, descriptors } = userData;
@@ -42,37 +78,106 @@ class FirebaseStorageManager {
         throw new Error('Label and descriptors are required');
       }
 
-      // Convert Float32Array to regular array untuk Firestore
-      const descriptorsArray = descriptors.map(desc => {
+      console.log('💾 Adding user:', label);
+      console.log('📊 Input descriptors:', {
+        count: descriptors.length,
+        firstType: typeof descriptors[0],
+        firstIsArray: Array.isArray(descriptors[0]),
+        firstIsFloat32: descriptors[0] instanceof Float32Array,
+        firstLength: descriptors[0]?.length
+      });
+
+      // PERBAIKAN: Convert to PLAIN ARRAY (bukan Float32Array!)
+      const descriptorsArray = descriptors.map((desc, index) => {
+        let plainArray;
+        
         if (desc instanceof Float32Array) {
-          return Array.from(desc);
+          // ✅ Convert Float32Array to plain array
+          plainArray = Array.from(desc);
+          console.log(`✅ Descriptor ${index}: Converted Float32Array to plain array (${plainArray.length} values)`);
+        } 
+        else if (Array.isArray(desc)) {
+          // ✅ Already plain array
+          plainArray = desc;
+          console.log(`✅ Descriptor ${index}: Already plain array (${plainArray.length} values)`);
+        } 
+        else if (typeof desc === 'object' && desc !== null) {
+          // ⚠️ Object format {d0, d1, ...} - convert to array
+          console.warn(`⚠️ Descriptor ${index}: Object format detected, converting...`);
+          plainArray = Object.keys(desc)
+            .sort((a, b) => {
+              const numA = parseInt(a.replace('d', ''));
+              const numB = parseInt(b.replace('d', ''));
+              return numA - numB;
+            })
+            .map(key => desc[key]);
+          console.log(`✅ Converted to array (${plainArray.length} values)`);
+        } 
+        else {
+          console.error('❌ Unknown descriptor type:', typeof desc);
+          throw new Error(`Unknown descriptor type: ${typeof desc}`);
         }
-        return desc;
+
+        // VALIDASI: Harus array dengan 128 element
+        if (!Array.isArray(plainArray)) {
+          throw new Error(`Descriptor ${index} is not an array after conversion`);
+        }
+
+        if (plainArray.length !== 128) {
+          console.error(`❌ Invalid descriptor length: ${plainArray.length} (expected 128)`);
+          throw new Error(`Invalid descriptor length: ${plainArray.length} (expected 128)`);
+        }
+
+        // VALIDASI: Semua element harus number
+        const allNumbers = plainArray.every(val => typeof val === 'number' && !isNaN(val));
+        if (!allNumbers) {
+          console.error('❌ Descriptor contains non-number values');
+          throw new Error('Descriptor contains non-number values');
+        }
+
+        console.log(`✅ Descriptor ${index} validated: ${plainArray.length} numbers`);
+        return plainArray; // ← RETURN PLAIN ARRAY!
       });
 
       const userDoc = {
         label: label,
-        descriptors: descriptorsArray,
+        descriptors: descriptorsArray, // ← Plain array of plain arrays
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
 
+      // LOG FINAL DATA
+      console.log('💾 Final data to save:', {
+        label: userDoc.label,
+        descriptorCount: userDoc.descriptors.length,
+        firstDescriptorLength: userDoc.descriptors[0]?.length,
+        firstDescriptorType: typeof userDoc.descriptors[0],
+        isArray: Array.isArray(userDoc.descriptors[0]),
+        first5Values: userDoc.descriptors[0]?.slice(0, 5)
+      });
+
+      // SAVE TO FIRESTORE
       const docRef = await this.addDoc(
         this.collection(this.db, 'users'),
         userDoc
       );
 
-      console.log('✅ User added:', label, 'ID:', docRef.id);
+      console.log('✅ User saved successfully!');
+      console.log('   ID:', docRef.id);
+      console.log('   Label:', label);
+      console.log('   Descriptors:', descriptorsArray.length);
+
       return { id: docRef.id, ...userDoc };
 
     } catch (error) {
       console.error('❌ Error adding user:', error);
+      console.error('   Error details:', error.message);
       throw error;
     }
   }
 
   /**
-   * Get semua users
+   * Get all users
    */
   async getUsers() {
     try {
@@ -98,48 +203,6 @@ class FirebaseStorageManager {
   }
 
   /**
-   * Get user by ID
-   */
-  async getUserById(userId) {
-    try {
-      const docRef = this.doc(this.db, 'users', userId);
-      const docSnap = await this.getDoc(docRef);
-
-      if (docSnap.exists()) {
-        return { id: docSnap.id, ...docSnap.data() };
-      } else {
-        throw new Error('User not found');
-      }
-    } catch (error) {
-      console.error('❌ Error getting user:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Update user
-   */
-  async updateUser(userId, userData) {
-    try {
-      const docRef = this.doc(this.db, 'users', userId);
-      
-      const updateData = {
-        ...userData,
-        updatedAt: new Date().toISOString()
-      };
-
-      await this.updateDoc(docRef, updateData);
-      
-      console.log('✅ User updated:', userId);
-      return { id: userId, ...updateData };
-
-    } catch (error) {
-      console.error('❌ Error updating user:', error);
-      throw error;
-    }
-  }
-
-  /**
    * Delete user
    */
   async deleteUser(userId) {
@@ -155,6 +218,233 @@ class FirebaseStorageManager {
       throw error;
     }
   }
+
+  // ==========================================
+  // 📋 ATTENDANCE MANAGEMENT
+  // ==========================================
+
+  async saveAttendance(attendanceData) {
+    try {
+      const { name, type, timestamp, confidence, location, device } = attendanceData;
+
+      if (!name || !type || !timestamp) {
+        throw new Error('Name, type, and timestamp are required');
+      }
+
+      const record = {
+        name: name,
+        type: type,
+        timestamp: timestamp,
+        confidence: confidence || null,
+        location: location || null,
+        device: device || 'unknown',
+        createdAt: new Date().toISOString()
+      };
+
+      const docRef = await this.addDoc(
+        this.collection(this.db, 'attendance'),
+        record
+      );
+
+      console.log('✅ Attendance saved:', type, 'for', name, 'ID:', docRef.id);
+      return { id: docRef.id, ...record };
+
+    } catch (error) {
+      console.error('❌ Error saving attendance:', error);
+      throw error;
+    }
+  }
+
+  async getAttendance(options = {}) {
+    try {
+      const { startDate, endDate, employeeName, type, limit } = options;
+
+      let q = this.collection(this.db, 'attendance');
+      const constraints = [];
+
+      if (employeeName) {
+        constraints.push(this.where('name', '==', employeeName));
+      }
+
+      if (type) {
+        constraints.push(this.where('type', '==', type));
+      }
+
+      if (startDate) {
+        constraints.push(this.where('timestamp', '>=', startDate));
+      }
+      if (endDate) {
+        constraints.push(this.where('timestamp', '<=', endDate));
+      }
+
+      constraints.push(this.orderBy('timestamp', 'desc'));
+
+      if (limit) {
+        constraints.push(this.limit(limit));
+      }
+
+      if (constraints.length > 0) {
+        q = this.query(q, ...constraints);
+      }
+
+      const querySnapshot = await this.getDocs(q);
+
+      const records = [];
+      querySnapshot.forEach((doc) => {
+        records.push({
+          id: doc.id,
+          ...doc.data()
+        });
+      });
+
+      console.log(`📥 Retrieved ${records.length} attendance records`);
+      return records;
+
+    } catch (error) {
+      console.error('❌ Error getting attendance:', error);
+      
+      try {
+        console.log('⚠️ Trying fallback query...');
+        const querySnapshot = await this.getDocs(
+          this.collection(this.db, 'attendance')
+        );
+
+        const records = [];
+        querySnapshot.forEach((doc) => {
+          records.push({
+            id: doc.id,
+            ...doc.data()
+          });
+        });
+
+        console.log(`📥 Fallback: Retrieved ${records.length} records`);
+        return records;
+
+      } catch (fallbackError) {
+        console.error('❌ Fallback also failed:', fallbackError);
+        throw fallbackError;
+      }
+    }
+  }
+
+  // ==========================================
+  // 👨‍💼 EMPLOYEE DETAILS
+  // ==========================================
+
+  async saveEmployee(employeeData) {
+    try {
+      const { name, id, email, department, phone, position } = employeeData;
+
+      if (!name) {
+        throw new Error('Employee name is required');
+      }
+
+      const employee = {
+        name: name,
+        id: id || null,
+        email: email || null,
+        department: department || null,
+        phone: phone || null,
+        position: position || null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+
+      const docRef = this.doc(this.db, 'employees', name);
+      await this.setDoc(docRef, employee, { merge: true });
+
+      console.log('✅ Employee details saved:', name);
+      return employee;
+
+    } catch (error) {
+      console.error('❌ Error saving employee:', error);
+      throw error;
+    }
+  }
+
+  async getEmployees() {
+    try {
+      const querySnapshot = await this.getDocs(
+        this.collection(this.db, 'employees')
+      );
+
+      const employees = [];
+      querySnapshot.forEach((doc) => {
+        employees.push({
+          id: doc.id,
+          ...doc.data()
+        });
+      });
+
+      console.log(`📥 Retrieved ${employees.length} employees`);
+      return employees;
+
+    } catch (error) {
+      console.error('❌ Error getting employees:', error);
+      throw error;
+    }
+  }
+
+  // ==========================================
+  // 🧹 UTILITY FUNCTIONS
+  // ==========================================
+
+  async clearAllUsers() {
+    try {
+      const querySnapshot = await this.getDocs(
+        this.collection(this.db, 'users')
+      );
+
+      const deletePromises = [];
+      querySnapshot.forEach((doc) => {
+        deletePromises.push(this.deleteDoc(doc.ref));
+      });
+
+      await Promise.all(deletePromises);
+      
+      console.log(`✅ Deleted ${deletePromises.length} users`);
+      return deletePromises.length;
+
+    } catch (error) {
+      console.error('❌ Error clearing users:', error);
+      throw error;
+    }
+  }
+
+  async exportAllData() {
+    try {
+      const users = await this.getUsers();
+      const attendance = await this.getAttendance();
+      const employees = await this.getEmployees();
+
+      const exportData = {
+        users: users,
+        attendance: attendance,
+        employees: employees,
+        exportDate: new Date().toISOString()
+      };
+
+      console.log('✅ Data exported');
+      return exportData;
+
+    } catch (error) {
+      console.error('❌ Error exporting data:', error);
+      throw error;
+    }
+  }
+}
+
+// ==========================================
+// 🌍 Make it globally available
+// ==========================================
+if (typeof window !== 'undefined') {
+  window.FirebaseStorageManager = FirebaseStorageManager;
+  console.log('✅ FirebaseStorageManager (FIXED VERSION) loaded and ready');
+}
+
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = FirebaseStorageManager;
+}
 
   // ==========================================
   // 📋 ATTENDANCE MANAGEMENT
