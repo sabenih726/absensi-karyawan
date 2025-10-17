@@ -8,20 +8,12 @@
     <title>Sistem Absensi Online - Portal Karyawan & Admin</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        /* Custom animations */
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(20px); }
             to { opacity: 1; transform: translateY(0); }
         }
         .fade-in {
             animation: fadeIn 0.6s ease-out;
-        }
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.8; }
-        }
-        .pulse-slow {
-            animation: pulse 2s ease-in-out infinite;
         }
     </style>
 </head>
@@ -51,16 +43,16 @@
                 <p class="text-xs text-blue-100 mt-1 opacity-90">Absen masuk & keluar</p>
             </a>
             
-            <!-- Dashboard Admin - Link ke Login -->
+            <!-- Dashboard Admin - Smart Button -->
             <button 
-               onclick="handleAdminAccess()"
+               id="adminBtn"
                class="group block w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white text-center font-bold py-4 px-6 rounded-lg transition-all duration-300 transform hover:scale-105 hover:shadow-lg"
                aria-label="Akses Dashboard Admin">
                 <span class="flex items-center justify-center space-x-3">
                     <span aria-hidden="true" class="text-2xl">👨‍💼</span>
-                    <span>Dashboard Admin</span>
+                    <span id="adminBtnText">Dashboard Admin</span>
                 </span>
-                <p class="text-xs text-green-100 mt-1 opacity-90">🔐 Login diperlukan</p>
+                <p class="text-xs text-green-100 mt-1 opacity-90" id="adminBtnSubtext">🔐 Login diperlukan</p>
             </button>
         </div>
         
@@ -98,45 +90,34 @@
         </div>
     </div>
 
-    <!-- Firebase Auth Check (Optional - Auto login jika sudah login) -->
+    <!-- Check Admin Auth Status -->
     <script type="module">
-        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
-        import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+        import { waitForAdminAuth } from './admin-auth.js';
 
-        // Firebase Config - SESUAIKAN DENGAN CONFIG ANDA
-        const firebaseConfig = {
-            apiKey: "YOUR_API_KEY",
-            authDomain: "YOUR_AUTH_DOMAIN",
-            projectId: "YOUR_PROJECT_ID",
-            storageBucket: "YOUR_STORAGE_BUCKET",
-            messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-            appId: "YOUR_APP_ID"
-        };
+        const adminBtn = document.getElementById('adminBtn');
+        const adminBtnText = document.getElementById('adminBtnText');
+        const adminBtnSubtext = document.getElementById('adminBtnSubtext');
 
-        // Initialize Firebase
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-
-        // Check if user is already logged in
-        let isAuthenticated = false;
-        
-        onAuthStateChanged(auth, (user) => {
+        // Check if admin is already logged in
+        waitForAdminAuth().then(user => {
             if (user) {
-                isAuthenticated = true;
-                console.log('✅ User sudah login:', user.email);
+                // User sudah login
+                adminBtnText.textContent = 'Dashboard Admin';
+                adminBtnSubtext.innerHTML = '✅ Logged in as: ' + user.email.split('@')[0];
+                
+                adminBtn.addEventListener('click', () => {
+                    window.location.href = 'admin.html';
+                });
+            } else {
+                // User belum login
+                adminBtnText.textContent = 'Dashboard Admin';
+                adminBtnSubtext.innerHTML = '🔐 Login diperlukan';
+                
+                adminBtn.addEventListener('click', () => {
+                    window.location.href = 'login.html';
+                });
             }
         });
-
-        // Handle Admin Access
-        window.handleAdminAccess = function() {
-            if (isAuthenticated) {
-                // Langsung ke admin jika sudah login
-                window.location.href = 'admin.html';
-            } else {
-                // Ke halaman login jika belum login
-                window.location.href = 'login.html';
-            }
-        };
     </script>
 
     <script>
