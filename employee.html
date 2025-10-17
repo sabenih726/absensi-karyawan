@@ -7,17 +7,13 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
     
-    <!-- Import Firebase Config -->
     <script type="module" src="firebase-config.js"></script>
     <script src="storage-firebase.js"></script>
     
     <style>
-        * {
-            -webkit-tap-highlight-color: transparent;
-        }
-        body {
-            overscroll-behavior: none;
-        }
+        * { -webkit-tap-highlight-color: transparent; }
+        body { overscroll-behavior: none; }
+        
         .scan-line {
             position: absolute;
             width: 100%;
@@ -29,19 +25,14 @@
             0% { top: 0; }
             100% { top: 100%; }
         }
-        .pulse {
-            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        
+        .countdown-ring {
+            transform: rotate(-90deg);
         }
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: .5; }
-        }
-        /* Mobile specific */
-        video {
-            object-fit: cover;
-        }
-        canvas {
-            pointer-events: none;
+        
+        @keyframes fillRing {
+            from { stroke-dashoffset: 314; }
+            to { stroke-dashoffset: 0; }
         }
     </style>
 </head>
@@ -52,7 +43,6 @@
         <div class="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
         <p class="mt-4 text-lg font-semibold text-gray-700 text-center" id="loadingText">Memuat sistem...</p>
         <p class="mt-2 text-sm text-gray-500 text-center" id="loadingStatus">Menginisialisasi...</p>
-        <div class="mt-4 text-xs text-gray-400" id="deviceInfo"></div>
     </div>
 
     <!-- Main Container -->
@@ -70,7 +60,6 @@
                 </a>
             </div>
             
-            <!-- Status Bar -->
             <div class="mt-3 flex items-center justify-between text-xs md:text-sm">
                 <div>
                     <span class="opacity-75">Waktu:</span>
@@ -88,27 +77,53 @@
         <div class="p-4">
             <div class="bg-white rounded-xl shadow-lg overflow-hidden">
                 
-                <!-- Video Container - Optimized for Mobile -->
+                <!-- Video Container -->
                 <div class="relative bg-black" style="aspect-ratio: 4/3;">
-                    <video id="video" autoplay playsinline muted 
-                           class="w-full h-full object-cover hidden"></video>
+                    <video id="video" autoplay playsinline muted class="w-full h-full object-cover hidden"></video>
                     <canvas id="overlay" class="absolute top-0 left-0 w-full h-full hidden"></canvas>
                     
-                    <!-- Scanning Effect -->
                     <div id="scanEffect" class="scan-line hidden"></div>
                     
-                    <!-- Camera Placeholder -->
                     <div id="cameraPlaceholder" class="absolute inset-0 flex items-center justify-center">
                         <div class="text-center text-white">
                             <div class="text-6xl mb-4">📹</div>
-                            <p class="text-sm px-4">Tekan tombol di bawah untuk mulai scan wajah</p>
+                            <p class="text-sm px-4">Tekan tombol untuk mulai scan</p>
                         </div>
                     </div>
 
-                    <!-- Detection Overlay -->
-                    <div id="detectionOverlay" class="absolute inset-0 flex items-center justify-center hidden">
-                        <div class="bg-black bg-opacity-75 text-white px-6 py-3 rounded-full">
-                            <span id="detectionText">Scanning...</span>
+                    <!-- Stable Recognition Indicator -->
+                    <div id="stableIndicator" class="absolute top-4 right-4 hidden">
+                        <div class="bg-green-500 text-white px-4 py-2 rounded-full text-sm font-semibold flex items-center gap-2">
+                            <svg class="w-5 h-5 countdown-ring" viewBox="0 0 100 100">
+                                <circle cx="50" cy="50" r="45" stroke="white" stroke-width="8" fill="none" opacity="0.3"/>
+                                <circle id="countdownCircle" cx="50" cy="50" r="45" stroke="white" stroke-width="8" fill="none" 
+                                        stroke-dasharray="314" stroke-dashoffset="314" class="countdown-ring"/>
+                            </svg>
+                            <span id="lockCountdown">3</span>
+                        </div>
+                    </div>
+
+                    <!-- Detection Status -->
+                    <div id="detectionOverlay" class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black to-transparent p-4 hidden">
+                        <p class="text-white text-center font-semibold" id="detectionText">Scanning...</p>
+                    </div>
+                </div>
+
+                <!-- Recognition Result - LOCKED STATE -->
+                <div id="recognitionResult" class="p-6 bg-gradient-to-r from-green-50 to-green-100 border-l-4 border-green-500 hidden">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-4">
+                            <div class="text-5xl">✅</div>
+                            <div>
+                                <p class="text-sm text-gray-600">Terdeteksi & Terkunci:</p>
+                                <p class="text-2xl font-bold text-gray-800" id="detectedName">-</p>
+                                <p class="text-xs text-gray-500 mt-1">Confidence: <span id="confidence">0%</span></p>
+                            </div>
+                        </div>
+                        <div class="text-green-600">
+                            <svg class="w-12 h-12" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd"/>
+                            </svg>
                         </div>
                     </div>
                 </div>
@@ -118,32 +133,30 @@
                     <p id="statusText" class="text-sm font-medium"></p>
                 </div>
 
-                <!-- Recognition Result -->
-                <div id="recognitionResult" class="p-4 bg-gradient-to-r from-green-50 to-green-100 hidden">
-                    <div class="text-center">
-                        <div class="text-4xl mb-2">✅</div>
-                        <p class="text-sm text-gray-600">Terdeteksi:</p>
-                        <p class="text-xl font-bold text-gray-800" id="detectedName">-</p>
-                        <p class="text-xs text-gray-500 mt-1">Confidence: <span id="confidence">0%</span></p>
-                    </div>
-                </div>
-
                 <!-- Control Buttons -->
                 <div class="p-4 space-y-2">
+                    <!-- Start Button -->
                     <button id="startBtn" class="w-full bg-blue-500 hover:bg-blue-600 active:bg-blue-700 text-white py-4 rounded-lg font-semibold transition text-lg shadow-md">
                         📹 Mulai Scan Wajah
                     </button>
                     
+                    <!-- Attendance Buttons - Only show when LOCKED -->
                     <div id="attendanceButtons" class="hidden space-y-2">
-                        <button id="checkInBtn" class="w-full bg-green-500 hover:bg-green-600 active:bg-green-700 text-white py-4 rounded-lg font-semibold transition text-lg shadow-md">
-                            ✅ Absen Masuk
+                        <button id="checkInBtn" class="w-full bg-green-500 hover:bg-green-600 active:bg-green-700 text-white py-4 rounded-lg font-semibold transition text-lg shadow-md flex items-center justify-center gap-2">
+                            <span class="text-2xl">✅</span>
+                            <span>Absen Masuk</span>
                         </button>
-                        <button id="checkOutBtn" class="w-full bg-red-500 hover:bg-red-600 active:bg-red-700 text-white py-4 rounded-lg font-semibold transition text-lg shadow-md">
-                            🚪 Absen Pulang
+                        <button id="checkOutBtn" class="w-full bg-red-500 hover:bg-red-600 active:bg-red-700 text-white py-4 rounded-lg font-semibold transition text-lg shadow-md flex items-center justify-center gap-2">
+                            <span class="text-2xl">🚪</span>
+                            <span>Absen Pulang</span>
+                        </button>
+                        <button id="cancelLockBtn" class="w-full bg-gray-400 hover:bg-gray-500 text-white py-3 rounded-lg font-semibold transition">
+                            🔓 Scan Ulang
                         </button>
                     </div>
                     
-                    <button id="stopBtn" class="w-full bg-gray-500 hover:bg-gray-600 active:bg-gray-700 text-white py-3 rounded-lg font-semibold transition hidden">
+                    <!-- Stop Button -->
+                    <button id="stopBtn" class="w-full bg-gray-500 hover:bg-gray-600 text-white py-3 rounded-lg font-semibold transition hidden">
                         ⏹️ Berhenti
                     </button>
                 </div>
@@ -157,7 +170,7 @@
                 </div>
             </div>
 
-            <!-- Debug Info (Hidden by default) -->
+            <!-- Debug Panel -->
             <div id="debugPanel" class="bg-gray-100 rounded-xl shadow-lg p-4 mt-4 hidden">
                 <div class="flex justify-between items-center mb-2">
                     <h3 class="text-sm font-bold">🔧 Debug Info</h3>
@@ -191,37 +204,34 @@
         // DEVICE DETECTION
         // ==========================================
         const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
         
-        console.log('Device:', isMobile ? 'Mobile' : 'Desktop');
-        console.log('Is iOS:', isIOS);
-
         // ==========================================
         // CONFIGURATION
         // ==========================================
         const CONFIG = {
-            // Mobile settings (lighter, faster)
             mobile: {
                 videoWidth: 320,
                 videoHeight: 240,
-                detectionInterval: 800, // ms
+                detectionInterval: 1000, // 1 detik
                 inputSize: 224,
                 scoreThreshold: 0.4,
-                matchThreshold: 0.65
+                matchThreshold: 0.65,
+                stableRecognitionTime: 2000, // 2 detik stabil
+                stableRecognitionCount: 3 // 3x deteksi sama
             },
-            // Desktop settings (higher quality)
             desktop: {
                 videoWidth: 640,
                 videoHeight: 480,
-                detectionInterval: 100,
+                detectionInterval: 500,
                 inputSize: 416,
                 scoreThreshold: 0.5,
-                matchThreshold: 0.6
+                matchThreshold: 0.6,
+                stableRecognitionTime: 1500,
+                stableRecognitionCount: 3
             }
         };
 
         const settings = isMobile ? CONFIG.mobile : CONFIG.desktop;
-        console.log('Using settings:', settings);
 
         // ==========================================
         // GLOBAL VARIABLES
@@ -231,32 +241,31 @@
         let faceMatcher = null;
         let storage = null;
         let isScanning = false;
+        let isLocked = false; // NEW: Lock state
         let stream = null;
         let detectedEmployee = null;
         let detectionTimeout = null;
         let debugLogs = [];
+
+        // Stable recognition tracking
+        let recognitionHistory = [];
+        let stableEmployee = null;
+        let lockCountdown = null;
 
         // ==========================================
         // DEBUG FUNCTIONS
         // ==========================================
         function debug(message, type = 'info') {
             const timestamp = new Date().toLocaleTimeString();
-            const log = { timestamp, message, type };
-            debugLogs.push(log);
+            debugLogs.push({ timestamp, message, type });
             console.log(`[${timestamp}] ${message}`);
-            
-            // Keep only last 50 logs
-            if (debugLogs.length > 50) {
-                debugLogs.shift();
-            }
-            
+            if (debugLogs.length > 50) debugLogs.shift();
             updateDebugPanel();
         }
 
         function updateDebugPanel() {
             const debugLog = document.getElementById('debugLog');
             if (!debugLog) return;
-            
             debugLog.innerHTML = debugLogs.slice(-20).reverse().map(log => {
                 const color = log.type === 'error' ? 'text-red-600' : 
                              log.type === 'success' ? 'text-green-600' : 'text-gray-600';
@@ -279,13 +288,9 @@
             try {
                 debug('🚀 Starting initialization...');
                 debug(`📱 Device: ${isMobile ? 'Mobile' : 'Desktop'}`);
-                
-                document.getElementById('deviceInfo').textContent = 
-                    `${isMobile ? '📱 Mobile' : '💻 Desktop'} | ${navigator.userAgent.substring(0, 50)}...`;
 
                 updateLoading('Menunggu Firebase...', 'Connecting...');
                 
-                // Wait for Firebase
                 if (window.waitForFirebase) {
                     await window.waitForFirebase();
                     debug('✅ Firebase connected', 'success');
@@ -301,19 +306,16 @@
                     });
                 }
 
-                // Initialize storage
                 if (typeof FirebaseStorageManager === 'undefined') {
                     throw new Error('FirebaseStorageManager not found');
                 }
                 storage = new FirebaseStorageManager();
                 debug('✅ Storage initialized', 'success');
 
-                // Load face-api models (lighter model for mobile)
-                updateLoading('Memuat AI Models...', isMobile ? 'Loading optimized for mobile...' : 'Loading face detection...');
+                updateLoading('Memuat AI Models...', 'Loading...');
                 
                 const MODEL_URL = 'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@0.22.2/weights';
                 
-                // Load only essential models
                 await Promise.all([
                     faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
                     faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
@@ -322,31 +324,24 @@
                 
                 debug('✅ Face-API models loaded', 'success');
 
-                // Load registered employees
-                updateLoading('Memuat Data Karyawan...', 'Loading employee database...');
+                updateLoading('Memuat Data Karyawan...', 'Loading...');
                 await loadEmployees();
 
-                // Update UI
                 document.getElementById('totalEmployees').textContent = labeledDescriptors.length;
 
-                // Start time update
                 setInterval(updateTime, 1000);
                 updateTime();
 
-                // Load today's attendance
                 await loadTodayAttendance();
 
-                // Hide loading, show content
                 document.getElementById('loadingScreen').classList.add('hidden');
                 document.getElementById('mainContent').classList.remove('hidden');
 
                 debug('✅ System ready!', 'success');
 
             } catch (error) {
-                debug('❌ Initialization error: ' + error.message, 'error');
-                console.error('Initialization error:', error);
+                debug('❌ Init error: ' + error.message, 'error');
                 updateLoading('Gagal memuat sistem', error.message);
-                
                 setTimeout(() => {
                     document.getElementById('debugPanel').classList.remove('hidden');
                 }, 1000);
@@ -376,7 +371,6 @@
                             continue;
                         }
 
-                        // Convert descriptors
                         const descriptors = user.descriptors.map(desc => {
                             if (Array.isArray(desc)) {
                                 return new Float32Array(desc);
@@ -402,11 +396,9 @@
                     throw new Error('Tidak ada data wajah yang valid');
                 }
 
-                // Create FaceMatcher with mobile-optimized threshold
                 faceMatcher = new faceapi.FaceMatcher(labeledDescriptors, settings.matchThreshold);
                 
                 debug(`✅ FaceMatcher ready with ${labeledDescriptors.length} employees`, 'success');
-                debug(`🎯 Match threshold: ${settings.matchThreshold}`);
 
             } catch (error) {
                 debug('❌ Load employees error: ' + error.message, 'error');
@@ -425,24 +417,19 @@
                 overlay = document.getElementById('overlay');
                 scanEffect = document.getElementById('scanEffect');
 
-                // Mobile-specific camera constraints
                 const constraints = {
                     video: {
                         width: { ideal: settings.videoWidth },
                         height: { ideal: settings.videoHeight },
                         facingMode: 'user',
-                        // Mobile optimizations
                         frameRate: { ideal: isMobile ? 15 : 30 },
                         aspectRatio: { ideal: 4/3 }
                     }
                 };
 
-                debug('📹 Requesting camera with constraints: ' + JSON.stringify(constraints));
-
                 stream = await navigator.mediaDevices.getUserMedia(constraints);
                 video.srcObject = stream;
                 
-                // Wait for video ready
                 await new Promise(resolve => {
                     video.onloadedmetadata = () => {
                         video.play();
@@ -452,18 +439,15 @@
 
                 debug(`✅ Camera started: ${video.videoWidth}x${video.videoHeight}`, 'success');
 
-                // Show video
                 document.getElementById('cameraPlaceholder').classList.add('hidden');
                 video.classList.remove('hidden');
                 overlay.classList.remove('hidden');
                 scanEffect.classList.remove('hidden');
                 document.getElementById('detectionOverlay').classList.remove('hidden');
 
-                // Update buttons
                 document.getElementById('startBtn').classList.add('hidden');
                 document.getElementById('stopBtn').classList.remove('hidden');
 
-                // Set canvas size
                 const displaySize = { 
                     width: video.videoWidth || settings.videoWidth, 
                     height: video.videoHeight || settings.videoHeight 
@@ -471,29 +455,31 @@
                 faceapi.matchDimensions(overlay, displaySize);
 
                 isScanning = true;
+                isLocked = false;
                 
-                // Start detection
                 detectFace();
 
             } catch (error) {
                 debug('❌ Camera error: ' + error.message, 'error');
-                showStatus('Gagal mengakses kamera. Pastikan izin kamera diaktifkan.', 'error');
-                
-                // Show helpful message for mobile
-                if (isMobile) {
-                    showStatus('📱 Mobile: Pastikan Chrome/Safari sudah mendapat izin kamera', 'error');
-                }
+                showStatus('Gagal mengakses kamera', 'error');
             }
         });
 
         document.getElementById('stopBtn').addEventListener('click', stopCamera);
 
+        document.getElementById('cancelLockBtn')?.addEventListener('click', () => {
+            debug('🔓 Unlocking and resuming scan');
+            unlockRecognition();
+            isScanning = true;
+            detectFace();
+        });
+
         function stopCamera() {
             isScanning = false;
+            isLocked = false;
             
-            if (detectionTimeout) {
-                clearTimeout(detectionTimeout);
-            }
+            if (detectionTimeout) clearTimeout(detectionTimeout);
+            if (lockCountdown) clearTimeout(lockCountdown);
             
             if (stream) {
                 stream.getTracks().forEach(track => track.stop());
@@ -514,20 +500,22 @@
             document.getElementById('stopBtn').classList.add('hidden');
             document.getElementById('attendanceButtons').classList.add('hidden');
             document.getElementById('recognitionResult').classList.add('hidden');
+            document.getElementById('stableIndicator').classList.add('hidden');
 
             detectedEmployee = null;
+            recognitionHistory = [];
+            stableEmployee = null;
+            
             debug('📹 Camera stopped');
         }
 
         // ==========================================
-        // FACE DETECTION (MOBILE OPTIMIZED)
+        // FACE DETECTION with STABILITY CHECK
         // ==========================================
         async function detectFace() {
-            if (!isScanning || !video) return;
+            if (!isScanning || !video || isLocked) return;
 
             try {
-                document.getElementById('detectionText').textContent = 'Scanning...';
-
                 const detections = await faceapi
                     .detectAllFaces(video, new faceapi.TinyFaceDetectorOptions({
                         inputSize: settings.inputSize,
@@ -536,97 +524,124 @@
                     .withFaceLandmarks()
                     .withFaceDescriptors();
 
-                // Clear overlay
                 const ctx = overlay.getContext('2d');
                 ctx.clearRect(0, 0, overlay.width, overlay.height);
 
                 if (detections.length > 0) {
-                    debug(`👤 Detected ${detections.length} face(s)`);
-
-                    // Resize detections
                     const displaySize = { 
                         width: video.videoWidth || settings.videoWidth, 
                         height: video.videoHeight || settings.videoHeight 
                     };
                     const resizedDetections = faceapi.resizeResults(detections, displaySize);
 
-                    // Draw on mobile with thicker lines (easier to see)
                     if (isMobile) {
                         ctx.lineWidth = 3;
-                        faceapi.draw.drawDetections(overlay, resizedDetections);
-                    } else {
-                        faceapi.draw.drawDetections(overlay, resizedDetections);
-                        faceapi.draw.drawFaceLandmarks(overlay, resizedDetections);
                     }
+                    faceapi.draw.drawDetections(overlay, resizedDetections);
 
-                    // Match face
                     const detection = detections[0];
                     const bestMatch = faceMatcher.findBestMatch(detection.descriptor);
 
-                    const distance = bestMatch.distance.toFixed(4);
                     const confidence = ((1 - bestMatch.distance) * 100).toFixed(1);
-                    
-                    debug(`🔍 Match: ${bestMatch.label} (dist: ${distance}, conf: ${confidence}%)`);
 
                     if (bestMatch.label !== 'unknown') {
-                        // RECOGNIZED!
-                        detectedEmployee = {
+                        // Add to recognition history
+                        recognitionHistory.push({
                             name: bestMatch.label,
-                            confidence: confidence
-                        };
+                            confidence: confidence,
+                            timestamp: Date.now()
+                        });
 
-                        showRecognitionResult(detectedEmployee);
-                        document.getElementById('detectionText').textContent = `✅ ${detectedEmployee.name}`;
-                        
-                        debug(`✅ RECOGNIZED: ${detectedEmployee.name} (${confidence}%)`, 'success');
+                        // Keep only recent history (last 5 detections)
+                        if (recognitionHistory.length > 5) {
+                            recognitionHistory.shift();
+                        }
 
-                        // Draw result
+                        // Check stability: same person detected multiple times
+                        const recentMatches = recognitionHistory.filter(h => 
+                            h.name === bestMatch.label && 
+                            Date.now() - h.timestamp < 3000
+                        );
+
+                        debug(`🔍 Detected: ${bestMatch.label} (${confidence}%) - Stable count: ${recentMatches.length}/${settings.stableRecognitionCount}`);
+
+                        document.getElementById('detectionText').textContent = 
+                            `${bestMatch.label} (${recentMatches.length}/${settings.stableRecognitionCount})`;
+
+                        // If stable recognition achieved
+                        if (recentMatches.length >= settings.stableRecognitionCount) {
+                            lockRecognition({
+                                name: bestMatch.label,
+                                confidence: confidence
+                            });
+                        }
+
+                        // Draw
                         const box = resizedDetections[0].detection.box;
                         const drawBox = new faceapi.draw.DrawBox(box, {
                             label: `${bestMatch.label} (${confidence}%)`,
-                            boxColor: 'green',
+                            boxColor: recentMatches.length >= settings.stableRecognitionCount ? 'green' : 'yellow',
                             lineWidth: isMobile ? 3 : 2
                         });
                         drawBox.draw(overlay);
 
                     } else {
                         document.getElementById('detectionText').textContent = '❌ Tidak dikenali';
-                        showStatus('Wajah tidak dikenali', 'error');
-                        debug(`❌ Unknown face (distance: ${distance})`, 'error');
+                        recognitionHistory = [];
                     }
 
                 } else {
-                    // No face detected
-                    detectedEmployee = null;
                     document.getElementById('detectionText').textContent = '👤 Cari wajah...';
-                    document.getElementById('recognitionResult').classList.add('hidden');
-                    document.getElementById('attendanceButtons').classList.add('hidden');
+                    recognitionHistory = [];
                 }
 
             } catch (error) {
                 debug('❌ Detection error: ' + error.message, 'error');
-                console.error('Detection error:', error);
             }
 
-            // Continue scanning with mobile-optimized interval
             detectionTimeout = setTimeout(() => detectFace(), settings.detectionInterval);
         }
 
         // ==========================================
-        // SHOW RECOGNITION RESULT
+        // LOCK RECOGNITION (STABLE STATE)
         // ==========================================
-        function showRecognitionResult(employee) {
+        function lockRecognition(employee) {
+            if (isLocked) return;
+
+            isLocked = true;
+            isScanning = false; // STOP scanning
+            detectedEmployee = employee;
+
+            debug(`🔒 LOCKED: ${employee.name} (${employee.confidence}%)`, 'success');
+
+            // Show recognition result
             document.getElementById('detectedName').textContent = employee.name;
             document.getElementById('confidence').textContent = employee.confidence + '%';
             document.getElementById('recognitionResult').classList.remove('hidden');
             document.getElementById('attendanceButtons').classList.remove('hidden');
-            
-            showStatus(`✅ Terdeteksi: ${employee.name}`, 'success');
+            document.getElementById('detectionOverlay').classList.add('hidden');
+            document.getElementById('scanEffect').classList.add('hidden');
 
-            // Vibrate on mobile (if supported)
+            // Vibrate
             if (navigator.vibrate && isMobile) {
-                navigator.vibrate(200);
+                navigator.vibrate([200, 100, 200]);
             }
+
+            showStatus(`🔒 Terkunci: ${employee.name}. Silakan pilih absen.`, 'success');
+        }
+
+        function unlockRecognition() {
+            isLocked = false;
+            detectedEmployee = null;
+            recognitionHistory = [];
+            
+            document.getElementById('recognitionResult').classList.add('hidden');
+            document.getElementById('attendanceButtons').classList.add('hidden');
+            document.getElementById('detectionOverlay').classList.remove('hidden');
+            document.getElementById('scanEffect').classList.remove('hidden');
+            document.getElementById('stableIndicator').classList.add('hidden');
+            
+            showStatus('Scan dibuka kembali', 'info');
         }
 
         // ==========================================
@@ -636,8 +651,8 @@
         document.getElementById('checkOutBtn').addEventListener('click', () => doAttendance('check-out'));
 
         async function doAttendance(type) {
-            if (!detectedEmployee) {
-                showStatus('Tidak ada wajah terdeteksi!', 'error');
+            if (!detectedEmployee || !isLocked) {
+                showStatus('Tidak ada wajah terkunci!', 'error');
                 return;
             }
 
@@ -645,15 +660,17 @@
                 debug(`📝 Processing ${type} for ${detectedEmployee.name}...`);
                 
                 // Disable buttons
-                document.getElementById('checkInBtn').disabled = true;
-                document.getElementById('checkOutBtn').disabled = true;
+                const checkInBtn = document.getElementById('checkInBtn');
+                const checkOutBtn = document.getElementById('checkOutBtn');
+                checkInBtn.disabled = true;
+                checkOutBtn.disabled = true;
+                checkInBtn.classList.add('opacity-50');
+                checkOutBtn.classList.add('opacity-50');
                 
-                showStatus('Menyimpan absensi...', 'info');
+                showStatus('⏳ Menyimpan absensi...', 'info');
 
-                // Get location
                 const location = await getLocation();
 
-                // Save attendance
                 const attendanceData = {
                     name: detectedEmployee.name,
                     type: type,
@@ -665,27 +682,24 @@
 
                 await storage.saveAttendance(attendanceData);
                 
-                debug(`✅ ${type} saved!`, 'success');
+                debug(`✅ ${type} saved successfully!`, 'success');
 
-                // Show success modal
                 showSuccessModal(detectedEmployee.name, type, location);
 
-                // Reload attendance
                 await loadTodayAttendance();
 
-                // Stop camera
                 stopCamera();
-
-                // Re-enable buttons
-                document.getElementById('checkInBtn').disabled = false;
-                document.getElementById('checkOutBtn').disabled = false;
 
             } catch (error) {
                 debug(`❌ Attendance error: ${error.message}`, 'error');
                 showStatus('Gagal menyimpan: ' + error.message, 'error');
                 
-                document.getElementById('checkInBtn').disabled = false;
-                document.getElementById('checkOutBtn').disabled = false;
+                const checkInBtn = document.getElementById('checkInBtn');
+                const checkOutBtn = document.getElementById('checkOutBtn');
+                checkInBtn.disabled = false;
+                checkOutBtn.disabled = false;
+                checkInBtn.classList.remove('opacity-50');
+                checkOutBtn.classList.remove('opacity-50');
             }
         }
 
@@ -704,24 +718,20 @@
                 }, 5000);
 
                 navigator.geolocation.getCurrentPosition(
-                    async (position) => {
+                    (position) => {
                         clearTimeout(timeout);
                         const { latitude, longitude } = position.coords;
-                        
                         resolve({
                             lat: latitude,
                             lng: longitude,
                             address: `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`
                         });
                     },
-                    (error) => {
+                    () => {
                         clearTimeout(timeout);
                         resolve({ address: 'Location denied' });
                     },
-                    {
-                        timeout: 5000,
-                        enableHighAccuracy: false // Faster on mobile
-                    }
+                    { timeout: 5000, enableHighAccuracy: false }
                 );
             });
         }
@@ -744,7 +754,7 @@
                 const listContainer = document.getElementById('attendanceList');
                 
                 if (todayRecords.length === 0) {
-                    listContainer.innerHTML = '<p class="text-gray-500 text-center py-4 text-sm">Belum ada absensi hari ini</p>';
+                    listContainer.innerHTML = '<p class="text-gray-500 text-center py-4 text-sm">Belum ada absensi</p>';
                     return;
                 }
 
@@ -815,7 +825,6 @@
             
             modal.classList.remove('hidden');
 
-            // Auto close after 3 seconds on mobile
             if (isMobile) {
                 setTimeout(() => {
                     modal.classList.add('hidden');
@@ -844,19 +853,6 @@
             initialize();
         }
 
-        // Prevent zoom on double tap (iOS)
-        if (isIOS) {
-            let lastTouchEnd = 0;
-            document.addEventListener('touchend', (e) => {
-                const now = Date.now();
-                if (now - lastTouchEnd <= 300) {
-                    e.preventDefault();
-                }
-                lastTouchEnd = now;
-            }, false);
-        }
-
-        // Error handling
         window.addEventListener('unhandledrejection', (event) => {
             debug('❌ Unhandled error: ' + event.reason, 'error');
         });
