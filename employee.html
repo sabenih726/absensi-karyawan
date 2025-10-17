@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Form Absensi Karyawan</title>
+
+  <!-- Library -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+  <script type="module" src="firebase-config.js"></script>
+  <script src="storage-firebase.js"></script>
+
+    <!-- Style -->
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        /* Video Container */
+        .relative-container {
+            position: relative;
+            width: 100%;
+            padding-top: 75%;
+            background-color: #000;
+        }
+
+        #video,
+        #canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        /* Loader Animation */
+        .loader {
+            border: 8px solid #f3f3f3;
+            border-radius: 50%;
+            border-top: 8px solid #3498db;
+            width: 60px;
+            height: 60px;
+            animation: spin 2s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Clock Styling */
+        .clock {
+            font-family: 'Courier New', monospace;
+            font-size: 3rem;
+            font-weight: bold;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Custom Scrollbar */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 10px;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+
+        /* Responsive Clock */
+        @media (max-width: 768px) {
+            .clock {
+                font-size: 2rem;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .clock {
+                font-size: 1.5rem;
+            }
+        }
+    </style>
+</head>
+
+<body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen">
+
+    <!-- ========== LOADER ========== -->
+    <div id="loader-container" class="fixed inset-0 bg-white bg-opacity-90 flex flex-col justify-center items-center z-50">
+        <div class="loader"></div>
+        <p id="loader-text" class="mt-4 text-lg font-semibold text-gray-700">Memuat sistem...</p>
+    </div>
+
+    <!-- ========== MODAL ALERT ========== -->
+    <div id="alertModal" class="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 hidden">
+        <div class="bg-white p-8 rounded-2xl shadow-2xl text-center max-w-md w-full mx-4 transform transition-all">
+            <div id="alertIcon" class="text-6xl mb-4">✅</div>
+            <p id="alertMessage" class="text-xl font-bold mb-2 text-gray-800"></p>
+            <p id="alertDetail" class="text-gray-600 mb-6"></p>
+            <button id="alertClose" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-8 rounded-lg transition duration-300 transform hover:scale-105">
+                OK
+            </button>
+        </div>
+    </div>
+
+    <!-- ========== MAIN CONTAINER ========== -->
+    <div class="container mx-auto px-4 py-6 max-w-7xl">
+
+        <!-- ========== HEADER ========== -->
+        <header class="text-center mb-8">
+            <h1 class="text-3xl md:text-4xl lg:text-5xl font-bold text-gray-800 mb-4">
+                🏢 Sistem Absensi Karyawan
+            </h1>
+
+            <!-- Real-time Clock -->
+            <div id="clock" class="clock text-blue-600 my-4">00:00:00</div>
+            <div id="date" class="text-base md:text-lg text-gray-600 mb-4">Loading...</div>
+
+            <!-- Location Status -->
+            <div class="inline-flex items-center gap-2 bg-white px-6 py-3 rounded-full shadow-lg border border-gray-200">
+                <span id="locationIcon" class="text-xl">📍</span>
+                <span id="locationText" class="text-sm md:text-base font-medium text-gray-700">
+                    Mendapatkan lokasi...
+                </span>
+            </div>
+        </header>
+
+        <!-- ========== MAIN CONTENT ========== -->
+        <main class="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
+
+            <!-- ========== SECTION: KAMERA ========== -->
+            <section class="bg-white rounded-2xl shadow-xl p-6 lg:p-8">
+                <h2 class="text-2xl font-bold mb-6 text-gray-800 flex items-center gap-2">
+                    <span>📸</span>
+                    <span>Kamera</span>
+                </h2>
+
+                <!-- Video Container -->
+                <div class="relative-container rounded-xl overflow-hidden border-4 border-gray-200 shadow-inner mb-4">
+                    <video id="video" autoplay muted playsinline></video>
+                    <canvas id="canvas"></canvas>
+                </div>
+
+                <!-- Recognition Status -->
+                <div id="recognitionStatus" class="p-6 rounded-xl bg-gradient-to-r from-gray-50 to-gray-100 text-center border border-gray-200">
+                    <p class="text-sm text-gray-500 mb-2">Arahkan wajah ke kamera</p>
+                    <p id="recognizedName" class="text-2xl md:text-3xl font-bold text-gray-800">-</p>
+                </div>
+            </section>
+
+            <!-- ========== SECTION: ABSENSI & AKTIVITAS ========== -->
+            <div class="space-y-6">
+
+                <!-- Absensi Buttons -->
+                <section class="bg-white rounded-2xl shadow-xl p-6 lg:p-8">
+                    <h2 class="text-2xl font-bold mb-6 text-gray-800 flex items-center gap-2">
+                        <span>⏰</span>
+                        <span>Absensi</span>
+                    </h2>
+
+                    <!-- Buttons Grid -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <!-- Check In Button -->
+                        <button id="checkInBtn" class="bg-gradient-to-br from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-bold py-6 px-6 rounded-xl shadow-lg transition transform hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none">
+                            <span class="text-4xl mb-2 block">📥</span>
+                            <span class="text-xl block mb-1">MASUK</span>
+                            <span id="checkInTime" class="block text-sm opacity-90">Belum absen</span>
+                        </button>
+
+                        <!-- Check Out Button -->
+                        <button id="checkOutBtn" class="bg-gradient-to-br from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white font-bold py-6 px-6 rounded-xl shadow-lg transition transform hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none">
+                            <span class="text-4xl mb-2 block">📤</span>
+                            <span class="text-xl block mb-1">PULANG</span>
+                            <span id="checkOutTime" class="block text-sm opacity-90">Belum absen</span>
+                        </button>
+                    </div>
+
+                    <!-- Work Duration -->
+                    <div id="workDuration" class="mt-6 p-6 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border-2 border-blue-200 hidden">
+                        <p class="text-sm text-gray-600 mb-1">⏱️ Durasi Kerja Hari Ini:</p>
+                        <p id="durationText" class="text-2xl md:text-3xl font-bold text-blue-600">
+                            0 jam 0 menit
+                        </p>
+                    </div>
+                </section>
+
+                <!-- Today Activity -->
+                <section class="bg-white rounded-2xl shadow-xl p-6 lg:p-8">
+                    <h2 class="text-2xl font-bold mb-6 text-gray-800 flex items-center gap-2">
+                        <span>📊</span>
+                        <span>Aktivitas Hari Ini</span>
+                    </h2>
+
+                    <div id="todayActivity" class="space-y-3 max-h-72 overflow-y-auto custom-scrollbar pr-2">
+                        <p class="text-gray-500 text-center py-8">Belum ada aktivitas</p>
+                    </div>
+                </section>
+
+            </div>
+
+        </main>
+
+        <!-- ========== FOOTER ========== -->
+        <footer class="mt-8 text-center text-gray-600 text-sm">
+            <p>&copy; 2024 Sistem Absensi Karyawan. All rights reserved.</p>
+        </footer>
+
+    </div>
+
+    <!-- ========== JAVASCRIPT ========== -->
+    <script>
+        // ===================================
+        // VOICE MANAGER
+        // ===================================
+        class VoiceManager {
+            constructor() {
+                this.synthesis = window.speechSynthesis;
+            }
+
+            speak(text) {
+                if (!('speechSynthesis' in window)) return;
+
+                this.synthesis.cancel();
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'id-ID';
+                utterance.rate = 1.0;
+                this.synthesis.speak(utterance);
+            }
+        }
+
+        // ===================================
+        // LOCATION MANAGER
+        // ===================================
+        class LocationManager {
+            constructor() {
+                this.currentLocation = null;
+            }
+
+            async getCurrentLocation() {
+                return new Promise((resolve, reject) => {
+                    if (!navigator.geolocation) {
+                        reject(new Error('Geolocation tidak didukung'));
+                        return;
+                    }
+
+                    navigator.geolocation.getCurrentPosition(
+                        async (position) => {
+                            const coords = {
+                                latitude: position.coords.latitude,
+                                longitude: position.coords.longitude,
+                                accuracy: position.coords.accuracy
+                            };
+
+                            try {
+                                const address = await this.reverseGeocode(coords.latitude, coords.longitude);
+                                this.currentLocation = {
+                                    ...coords,
+                                    address: address,
+                                    timestamp: new Date().toISOString()
+                                };
+                                resolve(this.currentLocation);
+                            } catch (error) {
+                                this.currentLocation = {
+                                    ...coords,
+                                    address: `${coords.latitude.toFixed(6)}, ${coords.longitude.toFixed(6)}`,
+                                    timestamp: new Date().toISOString()
+                                };
+                                resolve(this.currentLocation);
+                            }
+                        },
+                        (error) => reject(error),
+                        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+                    );
+                });
+            }
+
+            async reverseGeocode(lat, lon) {
+                try {
+                    const response = await fetch(
+                        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`,
+                        { headers: { 'Accept-Language': 'id' } }
+                    );
+
+                    if (!response.ok) throw new Error('Geocoding failed');
+
+                    const data = await response.json();
+                    const address = data.address;
+                    const parts = [];
+
+                    if (address.road) parts.push(address.road);
+                    if (address.suburb) parts.push(address.suburb);
+                    if (address.city || address.town) parts.push(address.city || address.town);
+
+                    return parts.length > 0 ? parts.join(', ') : data.display_name;
+                } catch (error) {
+                    return `${lat.toFixed(6)}, ${lon.toFixed(6)}`;
+                }
+            }
+        }
+
+        // ===================================
+        // GLOBAL VARIABLES
+        // ===================================
+        let storage = null;
+        let voiceManager = null;
+        let locationManager = null;
+        let faceMatcher = null;
+        let currentUser = null;
+
+        // ===================================
+        // DOM ELEMENTS
+        // ===================================
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const checkInBtn = document.getElementById('checkInBtn');
+        const checkOutBtn = document.getElementById('checkOutBtn');
+        const checkInTime = document.getElementById('checkInTime');
+        const checkOutTime = document.getElementById('checkOutTime');
+        const recognizedName = document.getElementById('recognizedName');
+        const todayActivity = document.getElementById('todayActivity');
+        const workDuration = document.getElementById('workDuration');
+        const durationText = document.getElementById('durationText');
+        const loaderContainer = document.getElementById('loader-container');
+        const loaderText = document.getElementById('loader-text');
+        const alertModal = document.getElementById('alertModal');
+        const alertMessage = document.getElementById('alertMessage');
+        const alertDetail = document.getElementById('alertDetail');
+        const alertIcon = document.getElementById('alertIcon');
+        const alertClose = document.getElementById('alertClose');
+        const clock = document.getElementById('clock');
+        const dateElement = document.getElementById('date');
+        const locationText = document.getElementById('locationText');
+        const locationIcon = document.getElementById('locationIcon');
+
+        // ===================================
+        // CLOCK UPDATE
+        // ===================================
+        function updateClock() {
+            const now = new Date();
+            clock.textContent = now.toLocaleTimeString('id-ID');
+            dateElement.textContent = now.toLocaleDateString('id-ID', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            });
+        }
+
+        setInterval(updateClock, 1000);
+        updateClock();
+
+        // ===================================
+        // SHOW ALERT
+        // ===================================
+        function showAlert(message, detail = '', icon = '✅') {
+            alertMessage.textContent = message;
+            alertDetail.textContent = detail;
+            alertIcon.textContent = icon;
+            alertModal.classList.remove('hidden');
+            if (voiceManager) {
+                voiceManager.speak(message);
+            }
+        }
+
+        alertClose.addEventListener('click', () => {
+            alertModal.classList.add('hidden');
+        });
+
+        // ===================================
+        // UPDATE LOCATION
+        // ===================================
+        async function updateLocation() {
+            if (!locationManager) return;
+            
+            try {
+                locationText.textContent = 'Mendapatkan lokasi...';
+                locationIcon.textContent = '🔄';
+
+                const location = await locationManager.getCurrentLocation();
+                locationIcon.textContent = '📍';
+                locationText.textContent = location.address;
+            } catch (error) {
+                locationIcon.textContent = '❌';
+                locationText.textContent = 'Lokasi tidak tersedia';
+                console.error('Location error:', error);
+            }
+        }
+
+        // ===================================
+        // LOAD MODELS
+        // ===================================
+        async function loadModels() {
+            const MODEL_URL = 'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@0.22.2/weights';
+            try {
+                loaderText.innerText = 'Memuat model deteksi wajah...';
+                await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
+
+                loaderText.innerText = 'Memuat model landmark wajah...';
+                await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
+
+                loaderText.innerText = 'Memuat model pengenalan wajah...';
+                await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
+
+                return true;
+            } catch (error) {
+                console.error("Gagal memuat model:", error);
+                return false;
+            }
+        }
+
+        // ===================================
+        // START WEBCAM
+        // ===================================
+        function startWebcam() {
+            navigator.mediaDevices.getUserMedia({ 
+                video: { 
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 }
+                } 
+            })
+            .then(stream => {
+                video.srcObject = stream;
+            })
+            .catch(err => {
+                console.error("Error accessing camera:", err);
+                showAlert("Tidak bisa mengakses kamera", "Pastikan Anda memberikan izin", "❌");
+            });
+        }
+
+        // ===================================
+        // LOAD FACE MATCHER
+        // ===================================
+        async function loadFaceMatcher() {
+            if (!storage) {
+                console.error('Storage not initialized');
+                return;
+            }
+
+            try {
+                const users = await storage.getUsers();
+                console.log('Loaded users:', users);
+                
+                if (users && users.length > 0) {
+                    const labeledDescriptors = users.map(user => {
+                        const descriptors = user.descriptors.map(d => new Float32Array(Object.values(d)));
+                        return new faceapi.LabeledFaceDescriptors(user.label, descriptors);
+                    });
+                    faceMatcher = new faceapi.FaceMatcher(labeledDescriptors, 0.6);
+                    console.log('Face matcher initialized with', users.length, 'users');
+                } else {
+                    console.warn('No users found in database');
+                }
+            } catch (error) {
+                console.error('Error loading face matcher:', error);
+            }
+        }
+
+        // ===================================
+        // UPDATE TODAY ACTIVITY
+        // ===================================
+        async function updateTodayActivity() {
+            if (!currentUser || !storage) return;
+
+            try {
+                const activities = await storage.getTodayAttendance(currentUser);
+                todayActivity.innerHTML = '';
+
+                if (!activities || activities.length === 0) {
+                    todayActivity.innerHTML = '<p class="text-gray-500 text-center py-8">Belum ada aktivitas</p>';
+                    checkInTime.textContent = 'Belum absen';
+                    checkOutTime.textContent = 'Belum absen';
+                    workDuration.classList.add('hidden');
+                    checkInBtn.disabled = false;
+                    checkOutBtn.disabled = true;
+                    return;
+                }
+
+                // Update button status
+                const checkIn = activities.find(a => a.type === 'check-in');
+                const checkOut = activities.find(a => a.type === 'check-out');
+
+                if (checkIn) {
+                    const time = new Date(checkIn.timestamp).toLocaleTimeString('id-ID', {
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    });
+                    checkInTime.textContent = time;
+                    checkInBtn.disabled = true;
+                    checkOutBtn.disabled = false;
+                } else {
+                    checkInTime.textContent = 'Belum absen';
+                    checkInBtn.disabled = false;
+                    checkOutBtn.disabled = true;
+                }
+
+                if (checkOut) {
+                    const time = new Date(checkOut.timestamp).toLocaleTimeString('id-ID', {
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    });
+                    checkOutTime.textContent = time;
+                    checkOutBtn.disabled = true;
+                } else {
+                    checkOutTime.textContent = 'Belum absen';
+                }
+
+                // Calculate duration
+                if (checkIn && checkOut) {
+                    const duration = new Date(checkOut.timestamp) - new Date(checkIn.timestamp);
+                    const hours = Math.floor(duration / (1000 * 60 * 60));
+                    const minutes = Math.floor((duration % (1000 * 60 * 60)) / (1000 * 60));
+                    durationText.textContent = `${hours} jam ${minutes} menit`;
+                    workDuration.classList.remove('hidden');
+                }
+
+                // Display activities
+                activities.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+                activities.forEach(activity => {
+                    const div = document.createElement('div');
+                    div.className = 'flex justify-between items-center p-4 bg-gradient-to-r from-gray-50 to-gray-100 rounded-lg border border-gray-200 hover:shadow-md transition';
+
+                    const type = activity.type === 'check-in' ?
+                        '<span class="text-green-600 font-semibold flex items-center gap-2"><span class="text-xl">📥</span> Masuk</span>' :
+                        '<span class="text-red-600 font-semibold flex items-center gap-2"><span class="text-xl">📤</span> Pulang</span>';
+
+                    const time = new Date(activity.timestamp).toLocaleTimeString('id-ID');
+
+                    div.innerHTML = `
+                        <div>${type}</div>
+                        <span class="text-gray-600 text-sm font-medium">${time}</span>
+                    `;
+                    todayActivity.appendChild(div);
+                });
+            } catch (error) {
+                console.error('Error updating today activity:', error);
+            }
+        }
+
+        // ===================================
+        // HANDLE ATTENDANCE
+        // ===================================
+        async function handleAttendance(type) {
+            if (!currentUser) {
+                showAlert("Wajah tidak dikenali", "Pastikan wajah Anda terlihat jelas di kamera", "⚠️");
+                return;
+            }
+
+            if (!storage) {
+                showAlert("Sistem belum siap", "Mohon tunggu sebentar", "⚠️");
+                return;
+            }
+
+            try {
+                // Check if already done today
+                const todayAttendance = await storage.getTodayAttendance(currentUser);
+                const alreadyDone = todayAttendance.find(a => a.type === type);
+
+                if (alreadyDone) {
+                    showAlert(
+                        "Sudah melakukan absensi",
+                        `Anda sudah ${type === 'check-in' ? 'masuk' : 'pulang'} hari ini`,
+                        "⚠️"
+                    );
+                    return;
+                }
+
+                // Update location
+                await updateLocation();
+                const location = locationManager ? locationManager.currentLocation : null;
+
+                // Save attendance
+                await storage.addAttendance({
+                    name: currentUser,
+                    type: type,
+                    location: location
+                });
+
+                // Show success
+                const typeText = type === 'check-in' ? 'Masuk' : 'Pulang';
+                showAlert(
+                    `Absensi ${typeText} Berhasil!`,
+                    `${currentUser} - ${new Date().toLocaleTimeString('id-ID')}`,
+                    type === 'check-in' ? '✅' : '👋'
+                );
+
+                // Update UI
+                await updateTodayActivity();
+            } catch (error) {
+                console.error('Error handling attendance:', error);
+                showAlert("Terjadi kesalahan", "Silakan coba lagi", "❌");
+            }
+        }
+
+        checkInBtn.addEventListener('click', () => handleAttendance('check-in'));
+        checkOutBtn.addEventListener('click', () => handleAttendance('check-out'));
+
+        // ===================================
+        // FACE DETECTION LOOP
+        // ===================================
+        video.addEventListener('play', () => {
+            const displaySize = { width: video.videoWidth, height: video.videoHeight };
+            faceapi.matchDimensions(canvas, displaySize);
+
+            setInterval(async () => {
+                if (!faceMatcher) return;
+
+                try {
+                    const detections = await faceapi
+                        .detectAllFaces(video, new faceapi.TinyFaceDetectorOptions())
+                        .withFaceLandmarks()
+                        .withFaceDescriptors();
+
+                    const resizedDetections = faceapi.resizeResults(detections, displaySize);
+                    const ctx = canvas.getContext('2d');
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                    let recognized = false;
+
+                    resizedDetections.forEach(detection => {
+                        const result = faceMatcher.findBestMatch(detection.descriptor);
+                        const box = detection.detection.box;
+
+                        if (result.label !== 'unknown') {
+                            currentUser = result.label;
+                            recognized = true;
+                            recognizedName.textContent = currentUser;
+                            recognizedName.className = 'text-2xl md:text-3xl font-bold text-green-600 mt-2';
+
+                            const drawBox = new faceapi.draw.DrawBox(box, {
+                                label: `${currentUser} (${Math.round((1 - result.distance) * 100)}%)`,
+                                boxColor: 'green'
+                            });
+                            drawBox.draw(canvas);
+                        } else {
+                            const drawBox = new faceapi.draw.DrawBox(box, {
+                                label: 'Tidak Dikenali',
+                                boxColor: 'red'
+                            });
+                            drawBox.draw(canvas);
+                        }
+                    });
+
+                    if (!recognized) {
+                        if (currentUser !== null) {
+                            currentUser = null;
+                            recognizedName.textContent = 'Tidak Dikenali';
+                            recognizedName.className = 'text-2xl md:text-3xl font-bold text-red-600 mt-2';
+                        }
+                    } else {
+                        updateTodayActivity();
+                    }
+                } catch (error) {
+                    console.error('Face detection error:', error);
+                }
+            }, 500);
+        });
+
+        // ===================================
+        // INITIALIZE APPLICATION
+        // ===================================
+        async function initialize() {
+            try {
+                loaderText.innerText = 'Menginisialisasi sistem...';
+                
+                // Initialize managers
+                voiceManager = new VoiceManager();
+                locationManager = new LocationManager();
+                
+                // Wait for Firebase to be ready
+                loaderText.innerText = 'Menghubungkan ke Firebase...';
+                
+                // Check if FirebaseStorageManager is available
+                if (typeof FirebaseStorageManager === 'undefined') {
+                    throw new Error('FirebaseStorageManager tidak ditemukan. Pastikan storage-firebase.js sudah dimuat.');
+                }
+                
+                storage = new FirebaseStorageManager();
+                
+                // Load face detection models
+                const modelsLoaded = await loadModels();
+                if (!modelsLoaded) {
+                    throw new Error('Gagal memuat model face detection');
+                }
+                
+                // Load face matcher
+                loaderText.innerText = 'Memuat data wajah...';
+                await loadFaceMatcher();
+                
+                // Get location
+                loaderText.innerText = 'Mendapatkan lokasi...';
+                updateLocation();
+                
+                // Hide loader
+                loaderContainer.style.display = 'none';
+                
+                // Start webcam
+                startWebcam();
+                
+                // Speak ready message
+                if (voiceManager) {
+                    voiceManager.speak('Sistem absensi siap digunakan');
+                }
+                
+                console.log('Initialization complete');
+            } catch (error) {
+                console.error("Init error:", error);
+                loaderText.innerText = 'Gagal memuat sistem: ' + error.message;
+                showAlert('Gagal memuat sistem', error.message, '❌');
+            }
+        }
+
+        // ===================================
+        // WAIT FOR DEPENDENCIES AND START
+        // ===================================
+        window.addEventListener('load', () => {
+            // Wait a bit for external scripts to load
+            setTimeout(() => {
+                initialize();
+            }, 500);
+        });
+    </script>
+
+</body>
+</html>
