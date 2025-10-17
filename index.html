@@ -16,6 +16,13 @@
         .fade-in {
             animation: fadeIn 0.6s ease-out;
         }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.8; }
+        }
+        .pulse-slow {
+            animation: pulse 2s ease-in-out infinite;
+        }
     </style>
 </head>
 <body class="bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 min-h-screen flex items-center justify-center p-4">
@@ -33,6 +40,7 @@
         
         <!-- Navigation Buttons -->
         <div class="space-y-4">
+            <!-- Portal Karyawan -->
             <a href="employee.html" 
                class="group block w-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white text-center font-bold py-4 px-6 rounded-lg transition-all duration-300 transform hover:scale-105 hover:shadow-lg"
                aria-label="Akses Portal Karyawan">
@@ -43,34 +51,36 @@
                 <p class="text-xs text-blue-100 mt-1 opacity-90">Absen masuk & keluar</p>
             </a>
             
-            <a href="admin.html" 
+            <!-- Dashboard Admin - Link ke Login -->
+            <button 
+               onclick="handleAdminAccess()"
                class="group block w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white text-center font-bold py-4 px-6 rounded-lg transition-all duration-300 transform hover:scale-105 hover:shadow-lg"
                aria-label="Akses Dashboard Admin">
                 <span class="flex items-center justify-center space-x-3">
                     <span aria-hidden="true" class="text-2xl">👨‍💼</span>
                     <span>Dashboard Admin</span>
                 </span>
-                <p class="text-xs text-green-100 mt-1 opacity-90">Kelola data & laporan</p>
-            </a>
+                <p class="text-xs text-green-100 mt-1 opacity-90">🔐 Login diperlukan</p>
+            </button>
         </div>
         
         <!-- Features -->
         <div class="mt-8 pt-6 border-t border-gray-200">
             <p class="text-center text-sm font-semibold text-gray-700 mb-3">Fitur Unggulan:</p>
             <div class="grid grid-cols-2 gap-3 text-center">
-                <div class="bg-blue-50 rounded-lg p-3">
+                <div class="bg-blue-50 rounded-lg p-3 hover:bg-blue-100 transition">
                     <span class="text-2xl mb-1 block">📸</span>
                     <p class="text-xs text-gray-700 font-medium">Face Recognition</p>
                 </div>
-                <div class="bg-green-50 rounded-lg p-3">
+                <div class="bg-green-50 rounded-lg p-3 hover:bg-green-100 transition">
                     <span class="text-2xl mb-1 block">📊</span>
                     <p class="text-xs text-gray-700 font-medium">Laporan Realtime</p>
                 </div>
-                <div class="bg-purple-50 rounded-lg p-3">
+                <div class="bg-purple-50 rounded-lg p-3 hover:bg-purple-100 transition">
                     <span class="text-2xl mb-1 block">📍</span>
                     <p class="text-xs text-gray-700 font-medium">GPS Tracking</p>
                 </div>
-                <div class="bg-orange-50 rounded-lg p-3">
+                <div class="bg-orange-50 rounded-lg p-3 hover:bg-orange-100 transition">
                     <span class="text-2xl mb-1 block">☁️</span>
                     <p class="text-xs text-gray-700 font-medium">Cloud Storage</p>
                 </div>
@@ -88,11 +98,52 @@
         </div>
     </div>
 
+    <!-- Firebase Auth Check (Optional - Auto login jika sudah login) -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+        import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+
+        // Firebase Config - SESUAIKAN DENGAN CONFIG ANDA
+        const firebaseConfig = {
+            apiKey: "YOUR_API_KEY",
+            authDomain: "YOUR_AUTH_DOMAIN",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_STORAGE_BUCKET",
+            messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+            appId: "YOUR_APP_ID"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+
+        // Check if user is already logged in
+        let isAuthenticated = false;
+        
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                isAuthenticated = true;
+                console.log('✅ User sudah login:', user.email);
+            }
+        });
+
+        // Handle Admin Access
+        window.handleAdminAccess = function() {
+            if (isAuthenticated) {
+                // Langsung ke admin jika sudah login
+                window.location.href = 'admin.html';
+            } else {
+                // Ke halaman login jika belum login
+                window.location.href = 'login.html';
+            }
+        };
+    </script>
+
     <script>
         // Auto-update copyright year
         document.getElementById('copyright').textContent = `© ${new Date().getFullYear()} Sistem Absensi`;
         
-        // Add loading indicator (optional)
+        // Add loading indicator
         window.addEventListener('load', () => {
             document.body.style.opacity = '0';
             document.body.style.transition = 'opacity 0.3s';
