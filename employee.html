@@ -7,33 +7,9 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
     
-    <script type="module" src="firebase-config.js"></script>
-    <script src="storage-firebase.js"></script>
-    
     <style>
         * { -webkit-tap-highlight-color: transparent; }
         body { overscroll-behavior: none; }
-        
-        .scan-line {
-            position: absolute;
-            width: 100%;
-            height: 2px;
-            background: linear-gradient(90deg, transparent, #3b82f6, transparent);
-            animation: scan 2s linear infinite;
-        }
-        @keyframes scan {
-            0% { top: 0; }
-            100% { top: 100%; }
-        }
-        
-        .countdown-ring {
-            transform: rotate(-90deg);
-        }
-        
-        @keyframes fillRing {
-            from { stroke-dashoffset: 314; }
-            to { stroke-dashoffset: 0; }
-        }
     </style>
 </head>
 <body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen">
@@ -43,6 +19,25 @@
         <div class="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
         <p class="mt-4 text-lg font-semibold text-gray-700 text-center" id="loadingText">Memuat sistem...</p>
         <p class="mt-2 text-sm text-gray-500 text-center" id="loadingStatus">Menginisialisasi...</p>
+        
+        <!-- Error Display -->
+        <div id="errorDisplay" class="hidden mt-6 p-4 bg-red-50 border-2 border-red-300 rounded-lg max-w-md">
+            <p class="text-red-700 font-bold mb-2">❌ Error:</p>
+            <p id="errorMessage" class="text-red-600 text-sm"></p>
+            <button onclick="location.reload()" class="mt-4 w-full bg-red-500 text-white py-2 rounded-lg hover:bg-red-600">
+                🔄 Muat Ulang
+            </button>
+        </div>
+
+        <!-- Debug Log -->
+        <div id="initLog" class="mt-6 p-4 bg-gray-100 rounded-lg max-w-md text-xs max-h-48 overflow-y-auto hidden">
+            <p class="font-bold mb-2">📋 Initialization Log:</p>
+            <div id="logContent"></div>
+        </div>
+        
+        <button id="toggleLog" class="mt-4 text-xs text-gray-500 hover:text-gray-700">
+            🔧 Show Debug Log
+        </button>
     </div>
 
     <!-- Main Container -->
@@ -55,21 +50,15 @@
                     <h1 class="text-xl md:text-2xl font-bold">Portal Karyawan</h1>
                     <p class="text-xs md:text-sm text-blue-100 mt-1">Absensi Face Recognition</p>
                 </div>
-                <a href="index.html" class="bg-white bg-opacity-20 hover:bg-opacity-30 text-white px-3 py-2 rounded-lg text-sm transition">
-                    🏠 Home
+                <a href="index.html" class="bg-white bg-opacity-20 hover:bg-opacity-30 text-white px-3 py-2 rounded-lg text-sm">
+                    🏠
                 </a>
             </div>
             
-            <div class="mt-3 flex items-center justify-between text-xs md:text-sm">
-                <div>
-                    <span class="opacity-75">Waktu:</span>
-                    <span class="font-semibold ml-1" id="currentTime">--:--</span>
-                </div>
-                <div>
-                    <span class="opacity-75">Karyawan:</span>
-                    <span class="font-semibold ml-1" id="totalEmployees">0</span>
-                </div>
-                <div id="systemStatus">🟢</div>
+            <div class="mt-3 flex items-center justify-between text-xs">
+                <span id="currentTime">--:--</span>
+                <span>Karyawan: <strong id="totalEmployees">0</strong></span>
+                <span id="systemStatus">🟢</span>
             </div>
         </div>
 
@@ -82,106 +71,62 @@
                     <video id="video" autoplay playsinline muted class="w-full h-full object-cover hidden"></video>
                     <canvas id="overlay" class="absolute top-0 left-0 w-full h-full hidden"></canvas>
                     
-                    <div id="scanEffect" class="scan-line hidden"></div>
-                    
                     <div id="cameraPlaceholder" class="absolute inset-0 flex items-center justify-center">
                         <div class="text-center text-white">
                             <div class="text-6xl mb-4">📹</div>
-                            <p class="text-sm px-4">Tekan tombol untuk mulai scan</p>
+                            <p class="text-sm px-4">Tekan tombol untuk mulai</p>
                         </div>
                     </div>
 
-                    <!-- Stable Recognition Indicator -->
-                    <div id="stableIndicator" class="absolute top-4 right-4 hidden">
-                        <div class="bg-green-500 text-white px-4 py-2 rounded-full text-sm font-semibold flex items-center gap-2">
-                            <svg class="w-5 h-5 countdown-ring" viewBox="0 0 100 100">
-                                <circle cx="50" cy="50" r="45" stroke="white" stroke-width="8" fill="none" opacity="0.3"/>
-                                <circle id="countdownCircle" cx="50" cy="50" r="45" stroke="white" stroke-width="8" fill="none" 
-                                        stroke-dasharray="314" stroke-dashoffset="314" class="countdown-ring"/>
-                            </svg>
-                            <span id="lockCountdown">3</span>
-                        </div>
-                    </div>
-
-                    <!-- Detection Status -->
-                    <div id="detectionOverlay" class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black to-transparent p-4 hidden">
-                        <p class="text-white text-center font-semibold" id="detectionText">Scanning...</p>
+                    <!-- Status Overlay -->
+                    <div id="statusOverlay" class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black to-transparent p-4 hidden">
+                        <p class="text-white text-center font-semibold text-sm" id="scanStatus">Scanning...</p>
                     </div>
                 </div>
 
-                <!-- Recognition Result - LOCKED STATE -->
-                <div id="recognitionResult" class="p-6 bg-gradient-to-r from-green-50 to-green-100 border-l-4 border-green-500 hidden">
+                <!-- Recognition Card - LOCKED -->
+                <div id="recognitionCard" class="p-6 bg-green-50 border-l-4 border-green-500 hidden">
                     <div class="flex items-center justify-between">
-                        <div class="flex items-center gap-4">
-                            <div class="text-5xl">✅</div>
-                            <div>
-                                <p class="text-sm text-gray-600">Terdeteksi & Terkunci:</p>
-                                <p class="text-2xl font-bold text-gray-800" id="detectedName">-</p>
-                                <p class="text-xs text-gray-500 mt-1">Confidence: <span id="confidence">0%</span></p>
-                            </div>
+                        <div>
+                            <p class="text-sm text-gray-600">🔒 Terdeteksi & Terkunci:</p>
+                            <p class="text-2xl font-bold text-gray-800" id="lockedName">-</p>
+                            <p class="text-xs text-gray-500 mt-1">Confidence: <span id="lockedConfidence">0%</span></p>
                         </div>
-                        <div class="text-green-600">
-                            <svg class="w-12 h-12" fill="currentColor" viewBox="0 0 20 20">
-                                <path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd"/>
-                            </svg>
-                        </div>
+                        <div class="text-5xl">✅</div>
                     </div>
                 </div>
 
-                <!-- Status Messages -->
-                <div id="statusMessage" class="p-4 text-center hidden">
-                    <p id="statusText" class="text-sm font-medium"></p>
-                </div>
-
-                <!-- Control Buttons -->
+                <!-- Buttons -->
                 <div class="p-4 space-y-2">
-                    <!-- Start Button -->
-                    <button id="startBtn" class="w-full bg-blue-500 hover:bg-blue-600 active:bg-blue-700 text-white py-4 rounded-lg font-semibold transition text-lg shadow-md">
-                        📹 Mulai Scan Wajah
+                    <button id="startBtn" class="w-full bg-blue-500 hover:bg-blue-600 text-white py-4 rounded-lg font-semibold text-lg">
+                        📹 Mulai Scan
                     </button>
                     
-                    <!-- Attendance Buttons - Only show when LOCKED -->
-                    <div id="attendanceButtons" class="hidden space-y-2">
-                        <button id="checkInBtn" class="w-full bg-green-500 hover:bg-green-600 active:bg-green-700 text-white py-4 rounded-lg font-semibold transition text-lg shadow-md flex items-center justify-center gap-2">
-                            <span class="text-2xl">✅</span>
-                            <span>Absen Masuk</span>
+                    <div id="actionButtons" class="hidden space-y-2">
+                        <button id="checkInBtn" class="w-full bg-green-500 hover:bg-green-600 text-white py-4 rounded-lg font-semibold text-lg">
+                            ✅ Absen Masuk
                         </button>
-                        <button id="checkOutBtn" class="w-full bg-red-500 hover:bg-red-600 active:bg-red-700 text-white py-4 rounded-lg font-semibold transition text-lg shadow-md flex items-center justify-center gap-2">
-                            <span class="text-2xl">🚪</span>
-                            <span>Absen Pulang</span>
+                        <button id="checkOutBtn" class="w-full bg-red-500 hover:bg-red-600 text-white py-4 rounded-lg font-semibold text-lg">
+                            🚪 Absen Pulang
                         </button>
-                        <button id="cancelLockBtn" class="w-full bg-gray-400 hover:bg-gray-500 text-white py-3 rounded-lg font-semibold transition">
-                            🔓 Scan Ulang
+                        <button id="rescanBtn" class="w-full bg-gray-400 hover:bg-gray-500 text-white py-3 rounded-lg font-semibold">
+                            🔄 Scan Ulang
                         </button>
                     </div>
                     
-                    <!-- Stop Button -->
-                    <button id="stopBtn" class="w-full bg-gray-500 hover:bg-gray-600 text-white py-3 rounded-lg font-semibold transition hidden">
-                        ⏹️ Berhenti
+                    <button id="stopBtn" class="w-full bg-gray-500 hover:bg-gray-600 text-white py-3 rounded-lg font-semibold hidden">
+                        ⏹️ Stop
                     </button>
                 </div>
             </div>
 
-            <!-- Recent Attendance -->
+            <!-- Today's Attendance -->
             <div class="bg-white rounded-xl shadow-lg p-4 mt-4">
                 <h3 class="text-lg font-bold mb-3">Riwayat Hari Ini</h3>
                 <div id="attendanceList" class="space-y-2">
                     <p class="text-gray-500 text-center py-4 text-sm">Memuat...</p>
                 </div>
             </div>
-
-            <!-- Debug Panel -->
-            <div id="debugPanel" class="bg-gray-100 rounded-xl shadow-lg p-4 mt-4 hidden">
-                <div class="flex justify-between items-center mb-2">
-                    <h3 class="text-sm font-bold">🔧 Debug Info</h3>
-                    <button id="closeDebug" class="text-xs text-gray-500">Close</button>
-                </div>
-                <div id="debugLog" class="text-xs space-y-1 max-h-48 overflow-y-auto"></div>
-            </div>
-            
-            <button id="toggleDebug" class="w-full mt-4 text-xs text-gray-400 hover:text-gray-600 py-2">
-                🔧 Debug Info
-            </button>
         </div>
     </div>
 
@@ -189,130 +134,123 @@
     <div id="successModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
         <div class="bg-white rounded-xl shadow-2xl p-6 max-w-sm w-full text-center">
             <div class="text-6xl mb-4">✅</div>
-            <h3 class="text-2xl font-bold mb-2" id="modalTitle">Absen Berhasil!</h3>
+            <h3 class="text-2xl font-bold mb-2" id="modalTitle">Berhasil!</h3>
             <p class="text-gray-600 mb-1 text-lg" id="modalName">-</p>
             <p class="text-sm text-gray-500 mb-2" id="modalTime">-</p>
-            <p class="text-xs text-gray-400 mb-4" id="modalLocation">📍 Loading...</p>
-            <button id="closeModal" class="w-full bg-blue-500 hover:bg-blue-600 text-white py-3 rounded-lg font-semibold">
+            <button id="closeModal" class="w-full bg-blue-500 hover:bg-blue-600 text-white py-3 rounded-lg font-semibold mt-4">
                 OK
             </button>
         </div>
     </div>
 
+    <!-- Load Firebase Config FIRST -->
+    <script type="module" src="firebase-config.js"></script>
+    <script src="storage-firebase.js"></script>
+
     <script>
         // ==========================================
-        // DEVICE DETECTION
+        // GLOBAL CONFIG
         // ==========================================
         const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
         
-        // ==========================================
-        // CONFIGURATION
-        // ==========================================
         const CONFIG = {
-            mobile: {
-                videoWidth: 320,
-                videoHeight: 240,
-                detectionInterval: 1000, // 1 detik
-                inputSize: 224,
-                scoreThreshold: 0.4,
-                matchThreshold: 0.65,
-                stableRecognitionTime: 2000, // 2 detik stabil
-                stableRecognitionCount: 3 // 3x deteksi sama
-            },
-            desktop: {
-                videoWidth: 640,
-                videoHeight: 480,
-                detectionInterval: 500,
-                inputSize: 416,
-                scoreThreshold: 0.5,
-                matchThreshold: 0.6,
-                stableRecognitionTime: 1500,
-                stableRecognitionCount: 3
-            }
+            videoWidth: isMobile ? 320 : 640,
+            videoHeight: isMobile ? 240 : 480,
+            detectionInterval: isMobile ? 1000 : 500,
+            matchThreshold: 0.65,
+            stableCount: 3 // Butuh 3x deteksi sama
         };
 
-        const settings = isMobile ? CONFIG.mobile : CONFIG.desktop;
-
         // ==========================================
-        // GLOBAL VARIABLES
+        // GLOBAL STATE
         // ==========================================
-        let video, overlay, scanEffect;
-        let labeledDescriptors = [];
-        let faceMatcher = null;
         let storage = null;
+        let faceMatcher = null;
         let isScanning = false;
-        let isLocked = false; // NEW: Lock state
-        let stream = null;
-        let detectedEmployee = null;
-        let detectionTimeout = null;
-        let debugLogs = [];
-
-        // Stable recognition tracking
+        let isLocked = false;
+        let videoStream = null;
+        let detectionTimer = null;
+        let lockedEmployee = null;
         let recognitionHistory = [];
-        let stableEmployee = null;
-        let lockCountdown = null;
+        
+        const logs = [];
 
         // ==========================================
-        // DEBUG FUNCTIONS
+        // LOGGING
         // ==========================================
-        function debug(message, type = 'info') {
+        function log(message, type = 'info') {
             const timestamp = new Date().toLocaleTimeString();
-            debugLogs.push({ timestamp, message, type });
-            console.log(`[${timestamp}] ${message}`);
-            if (debugLogs.length > 50) debugLogs.shift();
-            updateDebugPanel();
+            const logEntry = `[${timestamp}] ${message}`;
+            logs.push(logEntry);
+            console.log(logEntry);
+            
+            const logContent = document.getElementById('logContent');
+            if (logContent) {
+                const color = type === 'error' ? 'text-red-600' : type === 'success' ? 'text-green-600' : 'text-gray-600';
+                logContent.innerHTML = logs.slice(-20).reverse().map(l => `<div class="${color}">${l}</div>`).join('');
+            }
         }
 
-        function updateDebugPanel() {
-            const debugLog = document.getElementById('debugLog');
-            if (!debugLog) return;
-            debugLog.innerHTML = debugLogs.slice(-20).reverse().map(log => {
-                const color = log.type === 'error' ? 'text-red-600' : 
-                             log.type === 'success' ? 'text-green-600' : 'text-gray-600';
-                return `<div class="${color}">[${log.timestamp}] ${log.message}</div>`;
-            }).join('');
+        document.getElementById('toggleLog')?.addEventListener('click', () => {
+            document.getElementById('initLog').classList.toggle('hidden');
+        });
+
+        function updateStatus(text, status) {
+            document.getElementById('loadingText').textContent = text;
+            document.getElementById('loadingStatus').textContent = status;
+            log(`${text} - ${status}`);
         }
 
-        document.getElementById('toggleDebug')?.addEventListener('click', () => {
-            document.getElementById('debugPanel').classList.toggle('hidden');
-        });
-
-        document.getElementById('closeDebug')?.addEventListener('click', () => {
-            document.getElementById('debugPanel').classList.add('hidden');
-        });
+        function showError(message) {
+            log(message, 'error');
+            document.getElementById('errorMessage').textContent = message;
+            document.getElementById('errorDisplay').classList.remove('hidden');
+            document.getElementById('initLog').classList.remove('hidden');
+        }
 
         // ==========================================
         // INITIALIZATION
         // ==========================================
         async function initialize() {
             try {
-                debug('🚀 Starting initialization...');
-                debug(`📱 Device: ${isMobile ? 'Mobile' : 'Desktop'}`);
+                log('🚀 Starting initialization...');
+                log(`📱 Device: ${isMobile ? 'Mobile' : 'Desktop'}`);
 
-                updateLoading('Menunggu Firebase...', 'Connecting...');
+                // Step 1: Wait for Firebase
+                updateStatus('Step 1/4', 'Waiting for Firebase...');
                 
-                if (window.waitForFirebase) {
-                    await window.waitForFirebase();
-                    debug('✅ Firebase connected', 'success');
-                } else {
-                    await new Promise((resolve) => {
-                        const checkFirebase = setInterval(() => {
-                            if (window.firebaseDB && window.firebaseDB.isReady) {
-                                clearInterval(checkFirebase);
-                                resolve();
-                            }
-                        }, 100);
-                        setTimeout(() => clearInterval(checkFirebase), 10000);
-                    });
+                let firebaseReady = false;
+                let attempts = 0;
+                const maxAttempts = 30;
+
+                while (!firebaseReady && attempts < maxAttempts) {
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                    
+                    if (window.firebaseDB && window.firebaseDB.isReady) {
+                        firebaseReady = true;
+                        log('✅ Firebase ready', 'success');
+                    } else {
+                        attempts++;
+                        log(`⏳ Waiting for Firebase... (${attempts}/${maxAttempts})`);
+                    }
                 }
 
+                if (!firebaseReady) {
+                    throw new Error('Firebase timeout. Pastikan file firebase-config.js sudah di-load.');
+                }
+
+                // Step 2: Initialize Storage
+                updateStatus('Step 2/4', 'Initializing storage...');
+                
                 if (typeof FirebaseStorageManager === 'undefined') {
-                    throw new Error('FirebaseStorageManager not found');
+                    throw new Error('FirebaseStorageManager not found. Pastikan file storage-firebase.js sudah di-load.');
                 }
-                storage = new FirebaseStorageManager();
-                debug('✅ Storage initialized', 'success');
 
-                updateLoading('Memuat AI Models...', 'Loading...');
+                storage = new FirebaseStorageManager();
+                log('✅ Storage initialized', 'success');
+
+                // Step 3: Load Face-API Models
+                updateStatus('Step 3/4', 'Loading AI models...');
                 
                 const MODEL_URL = 'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@0.22.2/weights';
                 
@@ -322,73 +260,42 @@
                     faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)
                 ]);
                 
-                debug('✅ Face-API models loaded', 'success');
+                log('✅ Face-API models loaded', 'success');
 
-                updateLoading('Memuat Data Karyawan...', 'Loading...');
-                await loadEmployees();
-
-                document.getElementById('totalEmployees').textContent = labeledDescriptors.length;
-
-                setInterval(updateTime, 1000);
-                updateTime();
-
-                await loadTodayAttendance();
-
-                document.getElementById('loadingScreen').classList.add('hidden');
-                document.getElementById('mainContent').classList.remove('hidden');
-
-                debug('✅ System ready!', 'success');
-
-            } catch (error) {
-                debug('❌ Init error: ' + error.message, 'error');
-                updateLoading('Gagal memuat sistem', error.message);
-                setTimeout(() => {
-                    document.getElementById('debugPanel').classList.remove('hidden');
-                }, 1000);
-            }
-        }
-
-        // ==========================================
-        // LOAD EMPLOYEES
-        // ==========================================
-        async function loadEmployees() {
-            try {
-                debug('📥 Loading employees...');
-                const users = await storage.getUsers();
+                // Step 4: Load Employees
+                updateStatus('Step 4/4', 'Loading employees...');
                 
-                debug(`📊 Found ${users.length} employees`);
+                const users = await storage.getUsers();
+                log(`📊 Found ${users.length} registered users`);
 
                 if (users.length === 0) {
-                    throw new Error('Tidak ada karyawan terdaftar');
+                    throw new Error('Tidak ada karyawan terdaftar. Silakan registrasi di halaman admin terlebih dahulu.');
                 }
 
-                labeledDescriptors = [];
-
+                // Build FaceMatcher
+                const labeledDescriptors = [];
+                
                 for (const user of users) {
                     try {
                         if (!user.descriptors || user.descriptors.length === 0) {
-                            debug(`⚠️ ${user.label}: No descriptors`, 'error');
+                            log(`⚠️ ${user.label}: No descriptors`);
                             continue;
                         }
 
                         const descriptors = user.descriptors.map(desc => {
-                            if (Array.isArray(desc)) {
-                                return new Float32Array(desc);
-                            } else if (desc instanceof Float32Array) {
-                                return desc;
-                            } else {
-                                return new Float32Array(Object.values(desc));
-                            }
+                            if (Array.isArray(desc)) return new Float32Array(desc);
+                            if (desc instanceof Float32Array) return desc;
+                            return new Float32Array(Object.values(desc));
                         });
 
                         labeledDescriptors.push(
                             new faceapi.LabeledFaceDescriptors(user.label, descriptors)
                         );
 
-                        debug(`✅ ${user.label}: Loaded`, 'success');
+                        log(`✅ ${user.label}: Loaded`, 'success');
 
                     } catch (error) {
-                        debug(`❌ Error loading ${user.label}: ${error.message}`, 'error');
+                        log(`❌ Error loading ${user.label}: ${error.message}`, 'error');
                     }
                 }
 
@@ -396,40 +303,55 @@
                     throw new Error('Tidak ada data wajah yang valid');
                 }
 
-                faceMatcher = new faceapi.FaceMatcher(labeledDescriptors, settings.matchThreshold);
-                
-                debug(`✅ FaceMatcher ready with ${labeledDescriptors.length} employees`, 'success');
+                faceMatcher = new faceapi.FaceMatcher(labeledDescriptors, CONFIG.matchThreshold);
+                log(`✅ FaceMatcher ready with ${labeledDescriptors.length} employees`, 'success');
+
+                // Update UI
+                document.getElementById('totalEmployees').textContent = labeledDescriptors.length;
+
+                // Load today's attendance
+                await loadTodayAttendance();
+
+                // Start time update
+                setInterval(updateTime, 1000);
+                updateTime();
+
+                // Hide loading, show content
+                document.getElementById('loadingScreen').classList.add('hidden');
+                document.getElementById('mainContent').classList.remove('hidden');
+
+                log('✅ System ready!', 'success');
 
             } catch (error) {
-                debug('❌ Load employees error: ' + error.message, 'error');
-                throw error;
+                log(`❌ Initialization failed: ${error.message}`, 'error');
+                console.error('Init error:', error);
+                showError(error.message);
             }
         }
 
         // ==========================================
-        // CAMERA CONTROL
+        // CAMERA
         // ==========================================
-        document.getElementById('startBtn').addEventListener('click', async () => {
+        document.getElementById('startBtn').addEventListener('click', startCamera);
+        document.getElementById('stopBtn').addEventListener('click', stopCamera);
+        document.getElementById('rescanBtn').addEventListener('click', rescan);
+
+        async function startCamera() {
             try {
-                debug('📹 Starting camera...');
-                
-                video = document.getElementById('video');
-                overlay = document.getElementById('overlay');
-                scanEffect = document.getElementById('scanEffect');
+                log('📹 Starting camera...');
 
-                const constraints = {
+                const video = document.getElementById('video');
+                const overlay = document.getElementById('overlay');
+
+                videoStream = await navigator.mediaDevices.getUserMedia({
                     video: {
-                        width: { ideal: settings.videoWidth },
-                        height: { ideal: settings.videoHeight },
-                        facingMode: 'user',
-                        frameRate: { ideal: isMobile ? 15 : 30 },
-                        aspectRatio: { ideal: 4/3 }
+                        width: { ideal: CONFIG.videoWidth },
+                        height: { ideal: CONFIG.videoHeight },
+                        facingMode: 'user'
                     }
-                };
+                });
 
-                stream = await navigator.mediaDevices.getUserMedia(constraints);
-                video.srcObject = stream;
-                
+                video.srcObject = videoStream;
                 await new Promise(resolve => {
                     video.onloadedmetadata = () => {
                         video.play();
@@ -437,211 +359,182 @@
                     };
                 });
 
-                debug(`✅ Camera started: ${video.videoWidth}x${video.videoHeight}`, 'success');
+                log(`✅ Camera started: ${video.videoWidth}x${video.videoHeight}`, 'success');
 
+                // Show video
                 document.getElementById('cameraPlaceholder').classList.add('hidden');
                 video.classList.remove('hidden');
                 overlay.classList.remove('hidden');
-                scanEffect.classList.remove('hidden');
-                document.getElementById('detectionOverlay').classList.remove('hidden');
+                document.getElementById('statusOverlay').classList.remove('hidden');
 
+                // Update buttons
                 document.getElementById('startBtn').classList.add('hidden');
                 document.getElementById('stopBtn').classList.remove('hidden');
 
-                const displaySize = { 
-                    width: video.videoWidth || settings.videoWidth, 
-                    height: video.videoHeight || settings.videoHeight 
-                };
-                faceapi.matchDimensions(overlay, displaySize);
+                // Set canvas size
+                faceapi.matchDimensions(overlay, {
+                    width: video.videoWidth,
+                    height: video.videoHeight
+                });
 
                 isScanning = true;
                 isLocked = false;
-                
+                recognitionHistory = [];
+
                 detectFace();
 
             } catch (error) {
-                debug('❌ Camera error: ' + error.message, 'error');
-                showStatus('Gagal mengakses kamera', 'error');
+                log(`❌ Camera error: ${error.message}`, 'error');
+                alert('Gagal mengakses kamera. Pastikan izin kamera diaktifkan.');
             }
-        });
-
-        document.getElementById('stopBtn').addEventListener('click', stopCamera);
-
-        document.getElementById('cancelLockBtn')?.addEventListener('click', () => {
-            debug('🔓 Unlocking and resuming scan');
-            unlockRecognition();
-            isScanning = true;
-            detectFace();
-        });
+        }
 
         function stopCamera() {
             isScanning = false;
             isLocked = false;
             
-            if (detectionTimeout) clearTimeout(detectionTimeout);
-            if (lockCountdown) clearTimeout(lockCountdown);
+            if (detectionTimer) clearTimeout(detectionTimer);
             
-            if (stream) {
-                stream.getTracks().forEach(track => track.stop());
-                stream = null;
+            if (videoStream) {
+                videoStream.getTracks().forEach(track => track.stop());
+                videoStream = null;
             }
 
-            if (video) {
-                video.srcObject = null;
-                video.classList.add('hidden');
-            }
-
-            overlay.classList.add('hidden');
-            scanEffect.classList.add('hidden');
+            const video = document.getElementById('video');
+            video.srcObject = null;
+            video.classList.add('hidden');
+            
+            document.getElementById('overlay').classList.add('hidden');
             document.getElementById('cameraPlaceholder').classList.remove('hidden');
-            document.getElementById('detectionOverlay').classList.add('hidden');
+            document.getElementById('statusOverlay').classList.add('hidden');
             
             document.getElementById('startBtn').classList.remove('hidden');
             document.getElementById('stopBtn').classList.add('hidden');
-            document.getElementById('attendanceButtons').classList.add('hidden');
-            document.getElementById('recognitionResult').classList.add('hidden');
-            document.getElementById('stableIndicator').classList.add('hidden');
+            document.getElementById('actionButtons').classList.add('hidden');
+            document.getElementById('recognitionCard').classList.add('hidden');
 
-            detectedEmployee = null;
+            lockedEmployee = null;
             recognitionHistory = [];
-            stableEmployee = null;
             
-            debug('📹 Camera stopped');
+            log('📹 Camera stopped');
+        }
+
+        function rescan() {
+            log('🔄 Rescanning...');
+            isLocked = false;
+            lockedEmployee = null;
+            recognitionHistory = [];
+            
+            document.getElementById('actionButtons').classList.add('hidden');
+            document.getElementById('recognitionCard').classList.add('hidden');
+            document.getElementById('statusOverlay').classList.remove('hidden');
+            
+            isScanning = true;
+            detectFace();
         }
 
         // ==========================================
-        // FACE DETECTION with STABILITY CHECK
+        // FACE DETECTION
         // ==========================================
         async function detectFace() {
-            if (!isScanning || !video || isLocked) return;
+            if (!isScanning || isLocked) return;
 
             try {
+                const video = document.getElementById('video');
+                const overlay = document.getElementById('overlay');
+                
                 const detections = await faceapi
                     .detectAllFaces(video, new faceapi.TinyFaceDetectorOptions({
-                        inputSize: settings.inputSize,
-                        scoreThreshold: settings.scoreThreshold
+                        inputSize: 224,
+                        scoreThreshold: 0.5
                     }))
                     .withFaceLandmarks()
                     .withFaceDescriptors();
 
+                // Clear canvas
                 const ctx = overlay.getContext('2d');
                 ctx.clearRect(0, 0, overlay.width, overlay.height);
 
                 if (detections.length > 0) {
-                    const displaySize = { 
-                        width: video.videoWidth || settings.videoWidth, 
-                        height: video.videoHeight || settings.videoHeight 
-                    };
+                    const displaySize = { width: video.videoWidth, height: video.videoHeight };
                     const resizedDetections = faceapi.resizeResults(detections, displaySize);
 
-                    if (isMobile) {
-                        ctx.lineWidth = 3;
-                    }
                     faceapi.draw.drawDetections(overlay, resizedDetections);
 
                     const detection = detections[0];
                     const bestMatch = faceMatcher.findBestMatch(detection.descriptor);
-
                     const confidence = ((1 - bestMatch.distance) * 100).toFixed(1);
 
                     if (bestMatch.label !== 'unknown') {
-                        // Add to recognition history
+                        // Add to history
                         recognitionHistory.push({
                             name: bestMatch.label,
                             confidence: confidence,
-                            timestamp: Date.now()
+                            time: Date.now()
                         });
 
-                        // Keep only recent history (last 5 detections)
-                        if (recognitionHistory.length > 5) {
-                            recognitionHistory.shift();
-                        }
-
-                        // Check stability: same person detected multiple times
-                        const recentMatches = recognitionHistory.filter(h => 
-                            h.name === bestMatch.label && 
-                            Date.now() - h.timestamp < 3000
+                        // Keep only recent
+                        recognitionHistory = recognitionHistory.filter(h => 
+                            Date.now() - h.time < 3000
                         );
 
-                        debug(`🔍 Detected: ${bestMatch.label} (${confidence}%) - Stable count: ${recentMatches.length}/${settings.stableRecognitionCount}`);
+                        // Count matches
+                        const matches = recognitionHistory.filter(h => h.name === bestMatch.label);
+                        
+                        document.getElementById('scanStatus').textContent = 
+                            `${bestMatch.label} (${matches.length}/${CONFIG.stableCount}) - ${confidence}%`;
 
-                        document.getElementById('detectionText').textContent = 
-                            `${bestMatch.label} (${recentMatches.length}/${settings.stableRecognitionCount})`;
+                        log(`🔍 Detected: ${bestMatch.label} - ${matches.length}/${CONFIG.stableCount}`);
 
-                        // If stable recognition achieved
-                        if (recentMatches.length >= settings.stableRecognitionCount) {
-                            lockRecognition({
+                        // LOCK if stable
+                        if (matches.length >= CONFIG.stableCount) {
+                            lockEmployee({
                                 name: bestMatch.label,
                                 confidence: confidence
                             });
                         }
 
-                        // Draw
-                        const box = resizedDetections[0].detection.box;
-                        const drawBox = new faceapi.draw.DrawBox(box, {
-                            label: `${bestMatch.label} (${confidence}%)`,
-                            boxColor: recentMatches.length >= settings.stableRecognitionCount ? 'green' : 'yellow',
-                            lineWidth: isMobile ? 3 : 2
-                        });
-                        drawBox.draw(overlay);
-
                     } else {
-                        document.getElementById('detectionText').textContent = '❌ Tidak dikenali';
+                        document.getElementById('scanStatus').textContent = '❌ Tidak dikenali';
                         recognitionHistory = [];
                     }
 
                 } else {
-                    document.getElementById('detectionText').textContent = '👤 Cari wajah...';
+                    document.getElementById('scanStatus').textContent = '👤 Cari wajah...';
                     recognitionHistory = [];
                 }
 
             } catch (error) {
-                debug('❌ Detection error: ' + error.message, 'error');
+                log(`❌ Detection error: ${error.message}`, 'error');
             }
 
-            detectionTimeout = setTimeout(() => detectFace(), settings.detectionInterval);
+            detectionTimer = setTimeout(detectFace, CONFIG.detectionInterval);
         }
 
         // ==========================================
-        // LOCK RECOGNITION (STABLE STATE)
+        // LOCK EMPLOYEE
         // ==========================================
-        function lockRecognition(employee) {
+        function lockEmployee(employee) {
             if (isLocked) return;
 
             isLocked = true;
-            isScanning = false; // STOP scanning
-            detectedEmployee = employee;
+            isScanning = false;
+            lockedEmployee = employee;
 
-            debug(`🔒 LOCKED: ${employee.name} (${employee.confidence}%)`, 'success');
+            log(`🔒 LOCKED: ${employee.name} (${employee.confidence}%)`, 'success');
 
-            // Show recognition result
-            document.getElementById('detectedName').textContent = employee.name;
-            document.getElementById('confidence').textContent = employee.confidence + '%';
-            document.getElementById('recognitionResult').classList.remove('hidden');
-            document.getElementById('attendanceButtons').classList.remove('hidden');
-            document.getElementById('detectionOverlay').classList.add('hidden');
-            document.getElementById('scanEffect').classList.add('hidden');
+            // Update UI
+            document.getElementById('lockedName').textContent = employee.name;
+            document.getElementById('lockedConfidence').textContent = employee.confidence + '%';
+            
+            document.getElementById('recognitionCard').classList.remove('hidden');
+            document.getElementById('actionButtons').classList.remove('hidden');
+            document.getElementById('statusOverlay').classList.add('hidden');
 
             // Vibrate
-            if (navigator.vibrate && isMobile) {
+            if (navigator.vibrate) {
                 navigator.vibrate([200, 100, 200]);
             }
-
-            showStatus(`🔒 Terkunci: ${employee.name}. Silakan pilih absen.`, 'success');
-        }
-
-        function unlockRecognition() {
-            isLocked = false;
-            detectedEmployee = null;
-            recognitionHistory = [];
-            
-            document.getElementById('recognitionResult').classList.add('hidden');
-            document.getElementById('attendanceButtons').classList.add('hidden');
-            document.getElementById('detectionOverlay').classList.remove('hidden');
-            document.getElementById('scanEffect').classList.remove('hidden');
-            document.getElementById('stableIndicator').classList.add('hidden');
-            
-            showStatus('Scan dibuka kembali', 'info');
         }
 
         // ==========================================
@@ -651,103 +544,68 @@
         document.getElementById('checkOutBtn').addEventListener('click', () => doAttendance('check-out'));
 
         async function doAttendance(type) {
-            if (!detectedEmployee || !isLocked) {
-                showStatus('Tidak ada wajah terkunci!', 'error');
+            if (!lockedEmployee || !isLocked) {
+                alert('Tidak ada wajah yang terkunci!');
                 return;
             }
 
             try {
-                debug(`📝 Processing ${type} for ${detectedEmployee.name}...`);
-                
-                // Disable buttons
-                const checkInBtn = document.getElementById('checkInBtn');
-                const checkOutBtn = document.getElementById('checkOutBtn');
-                checkInBtn.disabled = true;
-                checkOutBtn.disabled = true;
-                checkInBtn.classList.add('opacity-50');
-                checkOutBtn.classList.add('opacity-50');
-                
-                showStatus('⏳ Menyimpan absensi...', 'info');
+                log(`📝 Processing ${type} for ${lockedEmployee.name}...`);
 
-                const location = await getLocation();
+                // Disable buttons
+                document.getElementById('checkInBtn').disabled = true;
+                document.getElementById('checkOutBtn').disabled = true;
 
                 const attendanceData = {
-                    name: detectedEmployee.name,
+                    name: lockedEmployee.name,
                     type: type,
                     timestamp: new Date().toISOString(),
-                    confidence: detectedEmployee.confidence,
-                    location: location,
+                    confidence: lockedEmployee.confidence,
+                    location: { address: 'Location data' },
                     device: isMobile ? 'mobile' : 'desktop'
                 };
 
                 await storage.saveAttendance(attendanceData);
-                
-                debug(`✅ ${type} saved successfully!`, 'success');
 
-                showSuccessModal(detectedEmployee.name, type, location);
+                log(`✅ ${type} saved!`, 'success');
 
+                // Show success modal
+                const typeText = type === 'check-in' ? 'Absen Masuk Berhasil!' : 'Absen Pulang Berhasil!';
+                document.getElementById('modalTitle').textContent = typeText;
+                document.getElementById('modalName').textContent = lockedEmployee.name;
+                document.getElementById('modalTime').textContent = new Date().toLocaleString('id-ID');
+                document.getElementById('successModal').classList.remove('hidden');
+
+                // Reload attendance list
                 await loadTodayAttendance();
 
+                // Stop camera
                 stopCamera();
 
             } catch (error) {
-                debug(`❌ Attendance error: ${error.message}`, 'error');
-                showStatus('Gagal menyimpan: ' + error.message, 'error');
+                log(`❌ Attendance error: ${error.message}`, 'error');
+                alert('Gagal menyimpan absensi: ' + error.message);
                 
-                const checkInBtn = document.getElementById('checkInBtn');
-                const checkOutBtn = document.getElementById('checkOutBtn');
-                checkInBtn.disabled = false;
-                checkOutBtn.disabled = false;
-                checkInBtn.classList.remove('opacity-50');
-                checkOutBtn.classList.remove('opacity-50');
+                document.getElementById('checkInBtn').disabled = false;
+                document.getElementById('checkOutBtn').disabled = false;
             }
         }
 
-        // ==========================================
-        // GET LOCATION
-        // ==========================================
-        async function getLocation() {
-            return new Promise((resolve) => {
-                if (!navigator.geolocation) {
-                    resolve({ address: 'Location not available' });
-                    return;
-                }
-
-                const timeout = setTimeout(() => {
-                    resolve({ address: 'Location timeout' });
-                }, 5000);
-
-                navigator.geolocation.getCurrentPosition(
-                    (position) => {
-                        clearTimeout(timeout);
-                        const { latitude, longitude } = position.coords;
-                        resolve({
-                            lat: latitude,
-                            lng: longitude,
-                            address: `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`
-                        });
-                    },
-                    () => {
-                        clearTimeout(timeout);
-                        resolve({ address: 'Location denied' });
-                    },
-                    { timeout: 5000, enableHighAccuracy: false }
-                );
-            });
-        }
+        document.getElementById('closeModal').addEventListener('click', () => {
+            document.getElementById('successModal').classList.add('hidden');
+        });
 
         // ==========================================
-        // LOAD TODAY ATTENDANCE
+        // LOAD ATTENDANCE
         // ==========================================
         async function loadTodayAttendance() {
             try {
                 const attendance = await storage.getAttendance();
                 const today = new Date().toDateString();
                 
-                const todayRecords = attendance.filter(record => {
-                    const recordDate = new Date(record.timestamp);
-                    return recordDate.toDateString() === today;
-                });
+                const todayRecords = attendance.filter(r => 
+                    new Date(r.timestamp).toDateString() === today
+                );
 
                 todayRecords.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 
@@ -758,19 +616,19 @@
                     return;
                 }
 
-                listContainer.innerHTML = todayRecords.map(record => {
-                    const time = new Date(record.timestamp).toLocaleTimeString('id-ID', {
+                listContainer.innerHTML = todayRecords.map(r => {
+                    const time = new Date(r.timestamp).toLocaleTimeString('id-ID', {
                         hour: '2-digit',
                         minute: '2-digit'
                     });
-                    const typeLabel = record.type === 'check-in' ? 
+                    const typeLabel = r.type === 'check-in' ? 
                         '<span class="text-green-600 text-xs">✅ Masuk</span>' : 
                         '<span class="text-red-600 text-xs">🚪 Pulang</span>';
                     
                     return `
                         <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
                             <div>
-                                <p class="font-semibold text-sm">${record.name}</p>
+                                <p class="font-semibold text-sm">${r.name}</p>
                                 <p class="text-xs text-gray-500">${time}</p>
                             </div>
                             ${typeLabel}
@@ -779,83 +637,34 @@
                 }).join('');
 
             } catch (error) {
-                console.error('Error loading attendance:', error);
+                log(`❌ Error loading attendance: ${error.message}`, 'error');
             }
         }
 
         // ==========================================
-        // UI HELPERS
+        // UTILITIES
         // ==========================================
-        function updateLoading(text, status) {
-            document.getElementById('loadingText').textContent = text;
-            document.getElementById('loadingStatus').textContent = status;
-        }
-
-        function showStatus(message, type = 'info') {
-            const statusDiv = document.getElementById('statusMessage');
-            const statusText = document.getElementById('statusText');
-            
-            statusDiv.classList.remove('hidden', 'bg-blue-100', 'bg-green-100', 'bg-red-100', 
-                                      'text-blue-700', 'text-green-700', 'text-red-700');
-            
-            if (type === 'success') {
-                statusDiv.classList.add('bg-green-100', 'text-green-700');
-            } else if (type === 'error') {
-                statusDiv.classList.add('bg-red-100', 'text-red-700');
-            } else {
-                statusDiv.classList.add('bg-blue-100', 'text-blue-700');
-            }
-            
-            statusText.textContent = message;
-            statusDiv.classList.remove('hidden');
-            
-            setTimeout(() => {
-                statusDiv.classList.add('hidden');
-            }, 3000);
-        }
-
-        function showSuccessModal(name, type, location) {
-            const modal = document.getElementById('successModal');
-            const typeText = type === 'check-in' ? 'Absen Masuk Berhasil!' : 'Absen Pulang Berhasil!';
-            
-            document.getElementById('modalTitle').textContent = typeText;
-            document.getElementById('modalName').textContent = name;
-            document.getElementById('modalTime').textContent = new Date().toLocaleString('id-ID');
-            document.getElementById('modalLocation').textContent = '📍 ' + (location.address || 'Unknown');
-            
-            modal.classList.remove('hidden');
-
-            if (isMobile) {
-                setTimeout(() => {
-                    modal.classList.add('hidden');
-                }, 3000);
-            }
-        }
-
-        document.getElementById('closeModal').addEventListener('click', () => {
-            document.getElementById('successModal').classList.add('hidden');
-        });
-
         function updateTime() {
-            const now = new Date();
-            document.getElementById('currentTime').textContent = now.toLocaleTimeString('id-ID', {
+            document.getElementById('currentTime').textContent = new Date().toLocaleTimeString('id-ID', {
                 hour: '2-digit',
                 minute: '2-digit'
             });
         }
 
         // ==========================================
-        // START APP
+        // START
         // ==========================================
         window.addEventListener('firebaseReady', initialize);
         
         if (window.firebaseDB && window.firebaseDB.isReady) {
             initialize();
+        } else {
+            setTimeout(() => {
+                if (!storage) {
+                    initialize();
+                }
+            }, 2000);
         }
-
-        window.addEventListener('unhandledrejection', (event) => {
-            debug('❌ Unhandled error: ' + event.reason, 'error');
-        });
     </script>
 </body>
 </html>
