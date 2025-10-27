@@ -3,7 +3,33 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Form Absensi Karyawan</title>
+  <title>Portal Karyawan - Sistem Absensi</title>
+
+  <!-- PWA Meta Tags -->
+  <meta name="theme-color" content="#3b82f6">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Absensi">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="description" content="Portal absensi karyawan dengan face recognition dan GPS tracking">
+  
+  <!-- PWA Manifest -->
+  <link rel="manifest" href="/manifest.json">
+  
+  <!-- iOS Icons -->
+  <link rel="apple-touch-icon" href="/icons/icon-152x152.png">
+  <link rel="apple-touch-icon" sizes="72x72" href="/icons/icon-72x72.png">
+  <link rel="apple-touch-icon" sizes="96x96" href="/icons/icon-96x96.png">
+  <link rel="apple-touch-icon" sizes="128x128" href="/icons/icon-128x128.png">
+  <link rel="apple-touch-icon" sizes="144x144" href="/icons/icon-144x144.png">
+  <link rel="apple-touch-icon" sizes="152x152" href="/icons/icon-152x152.png">
+  <link rel="apple-touch-icon" sizes="192x192" href="/icons/icon-192x192.png">
+  <link rel="apple-touch-icon" sizes="384x384" href="/icons/icon-384x384.png">
+  <link rel="apple-touch-icon" sizes="512x512" href="/icons/icon-512x512.png">
+  
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-72x72.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/icons/icon-72x72.png">
 
   <!-- Library -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -123,6 +149,17 @@
 
         <!-- ========== HEADER ========== -->
         <header class="text-center mb-8">
+            <!-- Back to Home Button -->
+            <div class="mb-4 flex justify-center">
+                <a href="index.html" 
+                   class="inline-flex items-center gap-2 bg-white px-4 py-2 rounded-lg shadow-md hover:shadow-lg transition duration-200 text-gray-700 hover:text-blue-600">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+                    </svg>
+                    <span class="font-medium">Kembali ke Home</span>
+                </a>
+            </div>
+
             <h1 class="text-3xl md:text-4xl lg:text-5xl font-bold text-gray-800 mb-4">
                 🏢 Sistem Absensi Karyawan
             </h1>
@@ -131,12 +168,27 @@
             <div id="clock" class="clock text-blue-600 my-4">00:00:00</div>
             <div id="date" class="text-base md:text-lg text-gray-600 mb-4">Loading...</div>
 
+            <!-- Network Status Indicator -->
+            <div id="networkStatus" class="inline-flex items-center gap-2 bg-green-100 text-green-700 px-4 py-2 rounded-full text-sm font-medium mb-4">
+                <span class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                <span>Online</span>
+            </div>
+
             <!-- Location Status -->
             <div class="inline-flex items-center gap-2 bg-white px-6 py-3 rounded-full shadow-lg border border-gray-200">
                 <span id="locationIcon" class="text-xl">📍</span>
                 <span id="locationText" class="text-sm md:text-base font-medium text-gray-700">
                     Mendapatkan lokasi...
                 </span>
+                <button 
+                    id="refreshLocationBtn"
+                    onclick="updateLocation()"
+                    class="ml-2 p-2 hover:bg-gray-100 rounded-full transition duration-200"
+                    title="Perbarui lokasi">
+                    <svg class="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                    </svg>
+                </button>
             </div>
         </header>
 
@@ -464,6 +516,11 @@
                     console.log('Face matcher initialized with', users.length, 'users');
                 } else {
                     console.warn('No users found in database');
+                    showAlert(
+                        'Belum Ada Karyawan Terdaftar', 
+                        'Silakan hubungi admin untuk mendaftarkan wajah Anda', 
+                        '⚠️'
+                    );
                 }
             } catch (error) {
                 console.error('Error loading face matcher:', error);
@@ -565,6 +622,12 @@
                 return;
             }
 
+            // Check if offline
+            if (!navigator.onLine) {
+                showAlert("Mode Offline", "Fitur absensi memerlukan koneksi internet", "⚠️");
+                return;
+            }
+
             try {
                 // Check if already done today
                 const todayAttendance = await storage.getTodayAttendance(currentUser);
@@ -616,8 +679,14 @@
             const displaySize = { width: video.videoWidth, height: video.videoHeight };
             faceapi.matchDimensions(canvas, displaySize);
 
-            setInterval(async () => {
-                if (!faceMatcher) return;
+            let detectionInterval = 500;
+            let consecutiveNoFace = 0;
+
+            const detectFace = async () => {
+                if (!faceMatcher) {
+                    setTimeout(detectFace, detectionInterval);
+                    return;
+                }
 
                 try {
                     const detections = await faceapi
@@ -630,6 +699,16 @@
                     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
                     let recognized = false;
+
+                    if (detections.length === 0) {
+                        consecutiveNoFace++;
+                        if (consecutiveNoFace > 5) {
+                            detectionInterval = 1000;
+                        }
+                    } else {
+                        consecutiveNoFace = 0;
+                        detectionInterval = 500;
+                    }
 
                     resizedDetections.forEach(detection => {
                         const result = faceMatcher.findBestMatch(detection.descriptor);
@@ -667,8 +746,40 @@
                 } catch (error) {
                     console.error('Face detection error:', error);
                 }
-            }, 500);
+
+                setTimeout(detectFace, detectionInterval);
+            };
+
+            detectFace();
         });
+
+        // ===================================
+        // NETWORK STATUS MONITOR
+        // ===================================
+        function updateNetworkStatus() {
+            const networkStatus = document.getElementById('networkStatus');
+            
+            if (navigator.onLine) {
+                networkStatus.className = 'inline-flex items-center gap-2 bg-green-100 text-green-700 px-4 py-2 rounded-full text-sm font-medium mb-4';
+                networkStatus.innerHTML = '<span class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span><span>Online</span>';
+            } else {
+                networkStatus.className = 'inline-flex items-center gap-2 bg-red-100 text-red-700 px-4 py-2 rounded-full text-sm font-medium mb-4';
+                networkStatus.innerHTML = '<span class="w-2 h-2 bg-red-500 rounded-full"></span><span>Offline</span>';
+            }
+        }
+
+        window.addEventListener('online', () => {
+            updateNetworkStatus();
+            showToast('Koneksi kembali', '✅');
+        });
+
+        window.addEventListener('offline', () => {
+            updateNetworkStatus();
+            showToast('Mode offline - Fitur terbatas', '⚠️');
+        });
+
+        // Initial check
+        updateNetworkStatus();
 
         // ===================================
         // INITIALIZE APPLICATION
@@ -684,12 +795,24 @@
                 // Wait for Firebase to be ready
                 loaderText.innerText = 'Menghubungkan ke Firebase...';
                 
-                // Check if FirebaseStorageManager is available
+                let attempts = 0;
+                const maxAttempts = 20;
+                
+                while (typeof FirebaseStorageManager === 'undefined' && attempts < maxAttempts) {
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                    attempts++;
+                }
+                
                 if (typeof FirebaseStorageManager === 'undefined') {
-                    throw new Error('FirebaseStorageManager tidak ditemukan. Pastikan storage-firebase.js sudah dimuat.');
+                    throw new Error('FirebaseStorageManager tidak ditemukan setelah ' + (maxAttempts * 500 / 1000) + ' detik');
                 }
                 
                 storage = new FirebaseStorageManager();
+                
+                if (storage.waitForConnection) {
+                    loaderText.innerText = 'Menunggu koneksi Firebase...';
+                    await storage.waitForConnection();
+                }
                 
                 // Load face detection models
                 const modelsLoaded = await loadModels();
@@ -716,10 +839,17 @@
                     voiceManager.speak('Sistem absensi siap digunakan');
                 }
                 
-                console.log('Initialization complete');
+                console.log('✅ Initialization complete');
             } catch (error) {
-                console.error("Init error:", error);
+                console.error("❌ Init error:", error);
                 loaderText.innerText = 'Gagal memuat sistem: ' + error.message;
+                
+                const retryBtn = document.createElement('button');
+                retryBtn.textContent = 'Coba Lagi';
+                retryBtn.className = 'mt-4 bg-blue-500 hover:bg-blue-600 text-white px-6 py-2 rounded-lg';
+                retryBtn.onclick = () => location.reload();
+                loaderContainer.appendChild(retryBtn);
+                
                 showAlert('Gagal memuat sistem', error.message, '❌');
             }
         }
@@ -728,12 +858,29 @@
         // WAIT FOR DEPENDENCIES AND START
         // ===================================
         window.addEventListener('load', () => {
-            // Wait a bit for external scripts to load
             setTimeout(() => {
                 initialize();
             }, 500);
         });
+
+        // ===================================
+        // TOAST NOTIFICATION
+        // ===================================
+        function showToast(message, icon = 'ℹ️') {
+            const toast = document.createElement('div');
+            toast.className = 'fixed bottom-20 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white px-6 py-3 rounded-lg shadow-lg z-50 flex items-center gap-2 transition-opacity duration-300';
+            toast.innerHTML = `<span>${icon}</span><span class="text-sm">${message}</span>`;
+            
+            document.body.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
     </script>
 
+    <!-- PWA Service Worker Registration -->
+    <script src="/pwa-handler.js"></script>
 </body>
 </html>
