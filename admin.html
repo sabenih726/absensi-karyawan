@@ -16,63 +16,528 @@
   <!-- PWA Manifest -->
   <link rel="manifest" href="/manifest.json">
   
-  <!-- iOS Icons -->
+  <!-- Icons -->
   <link rel="apple-touch-icon" href="/icons/icon-152x152.png">
-  <link rel="apple-touch-icon" sizes="72x72" href="/icons/icon-72x72.png">
-  <link rel="apple-touch-icon" sizes="96x96" href="/icons/icon-96x96.png">
-  <link rel="apple-touch-icon" sizes="128x128" href="/icons/icon-128x128.png">
-  <link rel="apple-touch-icon" sizes="144x144" href="/icons/icon-144x144.png">
-  <link rel="apple-touch-icon" sizes="152x152" href="/icons/icon-152x152.png">
-  <link rel="apple-touch-icon" sizes="192x192" href="/icons/icon-192x192.png">
-  <link rel="apple-touch-icon" sizes="384x384" href="/icons/icon-384x384.png">
-  <link rel="apple-touch-icon" sizes="512x512" href="/icons/icon-512x512.png">
-  
-  <!-- Favicon -->
   <link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-72x72.png">
-  <link rel="icon" type="image/png" sizes="16x16" href="/icons/icon-72x72.png">
 
   <!-- ============================== -->
-  <!-- LIBRARY CDN -->
+  <!-- CRITICAL CSS ONLY -->
   <!-- ============================== -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
-  <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
   
+  <style>
+    /* Loader Animation */
+    .loader {
+      border: 6px solid #f3f3f3;
+      border-radius: 50%;
+      border-top: 6px solid #3498db;
+      width: 50px;
+      height: 50px;
+      animation: spin 1s linear infinite;
+    }
+    
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    
+    /* Tab Styles */
+    .tab-active {
+      background: linear-gradient(to right, #3b82f6, #6366f1);
+      color: #fff;
+      border-bottom: 3px solid #3b82f6;
+    }
+    
+    .tab {
+      white-space: nowrap;
+      transition: all 0.3s;
+    }
+    
+    /* Skeleton Loading */
+    .skeleton {
+      background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+      background-size: 200% 100%;
+      animation: loading 1.5s infinite;
+    }
+    
+    @keyframes loading {
+      0% { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+    
+    /* Mobile Optimizations */
+    @media (max-width: 768px) {
+      .mobile-hide {
+        display: none !important;
+      }
+      
+      .mobile-compact {
+        padding: 0.5rem !important;
+        font-size: 0.875rem !important;
+      }
+      
+      .stat-card {
+        padding: 1rem !important;
+      }
+      
+      .stat-number {
+        font-size: 1.5rem !important;
+      }
+    }
+    
+    /* Smooth Transitions */
+    .fade-in {
+      animation: fadeIn 0.5s ease-in;
+    }
+    
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Tab Container Scroll */
+    .tab-container {
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none; /* Firefox */
+    }
+    
+    .tab-container::-webkit-scrollbar {
+      display: none; /* Chrome, Safari */
+    }
+  </style>
+</head>
+
+<body class="bg-gray-100">
+
   <!-- ============================== -->
-  <!-- 🔐 AUTH GUARD - LETAKKAN DI SINI -->
+  <!-- LOADER (Simplified) -->
   <!-- ============================== -->
-  <script type="module" src="./admin-auth.js"></script>
+  <div id="loader-container" class="fixed inset-0 bg-white bg-opacity-95 flex flex-col justify-center items-center z-50">
+    <div class="loader"></div>
+    <p id="loader-text" class="mt-4 text-base font-semibold text-gray-700">Memuat dashboard...</p>
+    <p id="loader-status" class="mt-2 text-sm text-gray-500">Mohon tunggu...</p>
+  </div>
+
+  <!-- ============================== -->
+  <!-- MODALS -->
+  <!-- ============================== -->
+  
+  <!-- Modal Konfirmasi -->
+  <div id="modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div class="bg-white p-6 rounded-lg shadow-xl max-w-md w-full mx-4">
+      <h3 id="modalTitle" class="text-xl font-bold mb-4"></h3>
+      <div id="modalContent"></div>
+      <div class="flex justify-end gap-2 mt-4">
+        <button id="modalCancel" class="px-4 py-2 bg-gray-300 hover:bg-gray-400 rounded-lg transition">Batal</button>
+        <button id="modalConfirm" class="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Alert Modal -->
+  <div id="alertModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div class="bg-white p-6 rounded-lg shadow-xl max-w-md w-full mx-4">
+      <div id="alertIcon" class="text-6xl text-center mb-4">✅</div>
+      <h3 id="alertTitle" class="text-xl font-bold mb-2 text-center"></h3>
+      <p id="alertMessage" class="text-gray-600 text-center mb-4"></p>
+      <div class="flex justify-center">
+        <button id="alertClose" class="px-6 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================== -->
+  <!-- HEADER (Mobile Optimized) -->
+  <!-- ============================== -->
+  <header class="bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg sticky top-0 z-40">
+    <div class="container mx-auto px-4 py-3 md:py-6">
+      <div class="flex justify-between items-center">
+        
+        <!-- Left: Title -->
+        <div class="flex items-center gap-2 md:gap-4">
+          <a href="index.html" class="text-white hover:text-blue-100 transition-colors duration-200" title="Kembali ke Home">
+            <svg class="w-6 h-6 md:w-8 md:h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
+            </svg>
+          </a>
+          <div>
+            <h1 class="text-lg md:text-3xl font-bold">Dashboard Admin</h1>
+            <p class="text-blue-100 text-xs md:text-sm mt-1 mobile-hide">Sistem Manajemen Absensi</p>
+          </div>
+        </div>
+        
+        <!-- Right: User Info & Actions -->
+        <div class="flex items-center gap-2 md:gap-3">
+          
+          <!-- Network Status (Mobile Compact) -->
+          <div id="networkStatusHeader" class="hidden md:inline-flex items-center gap-2 bg-white bg-opacity-20 px-3 py-1 rounded-full text-xs">
+            <span id="networkIconHeader" class="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
+            <span id="networkTextHeader">Online</span>
+          </div>
+          
+          <!-- User Email (Desktop Only) -->
+          <div class="text-right mobile-hide">
+            <p class="text-xs text-blue-100">Logged in as:</p>
+            <p class="text-sm font-semibold" id="userEmail">Loading...</p>
+          </div>
+          
+          <!-- Logout Button (Compact on Mobile) -->
+          <button 
+            onclick="handleLogout()" 
+            class="bg-white bg-opacity-20 hover:bg-opacity-30 px-2 md:px-4 py-2 rounded-lg text-xs md:text-sm transition duration-200 flex items-center gap-1 md:gap-2"
+            title="Logout">
+            <svg class="w-4 h-4 md:w-5 md:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+            </svg>
+            <span class="mobile-hide">Logout</span>
+          </button>
+        </div>
+      </div>
+      
+      <!-- Date/Time (Moved below on mobile) -->
+      <div class="mt-2 text-center md:text-right">
+        <p class="text-xs md:text-base font-semibold" id="currentDateTime">Loading...</p>
+      </div>
+    </div>
+  </header>
+
+  <!-- ============================== -->
+  <!-- NAVIGATION (Mobile Optimized) -->
+  <!-- ============================== -->
+  <div class="bg-white shadow-md sticky top-14 md:top-20 z-30">
+    <div class="container mx-auto px-2 md:px-4">
+      <div class="tab-container flex gap-1 overflow-x-auto">
+        <button class="tab px-3 md:px-6 py-2 md:py-3 rounded-t-lg tab-active text-xs md:text-base" data-tab="overview">
+          <span class="md:hidden">📊</span>
+          <span class="hidden md:inline">📊 Overview</span>
+        </button>
+        <button class="tab px-3 md:px-6 py-2 md:py-3 rounded-t-lg hover:bg-gray-100 text-xs md:text-base" data-tab="employees">
+          <span class="md:hidden">👥</span>
+          <span class="hidden md:inline">👥 Karyawan</span>
+        </button>
+        <button class="tab px-3 md:px-6 py-2 md:py-3 rounded-t-lg hover:bg-gray-100 text-xs md:text-base" data-tab="attendance">
+          <span class="md:hidden">📋</span>
+          <span class="hidden md:inline">📋 Absensi</span>
+        </button>
+        <button class="tab px-3 md:px-6 py-2 md:py-3 rounded-t-lg hover:bg-gray-100 text-xs md:text-base" data-tab="reports">
+          <span class="md:hidden">📈</span>
+          <span class="hidden md:inline">📈 Laporan</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================== -->
+  <!-- CONTENT -->
+  <!-- ============================== -->
+  <div class="container mx-auto px-2 md:px-4 py-4 md:py-8">
+            
+    <!-- ========== OVERVIEW TAB ========== -->
+    <div id="overview" class="tab-content">
+      
+      <!-- Statistics Cards (Mobile Optimized) -->
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-6 mb-6 md:mb-8">
+        
+        <!-- Total Karyawan -->
+        <div class="stat-card bg-white rounded-xl shadow-md p-4 md:p-6 fade-in">
+          <div class="flex flex-col md:flex-row items-center justify-between">
+            <div class="text-center md:text-left w-full">
+              <p class="text-gray-500 text-xs md:text-sm mb-1">Total Karyawan</p>
+              <p class="stat-number text-2xl md:text-3xl font-bold text-gray-800" id="totalEmployees">
+                <span class="skeleton inline-block w-16 h-8 rounded">0</span>
+              </p>
+            </div>
+            <span class="text-2xl md:text-4xl mt-2 md:mt-0">👥</span>
+          </div>
+        </div>
+        
+        <!-- Hadir Hari Ini -->
+        <div class="stat-card bg-white rounded-xl shadow-md p-4 md:p-6 fade-in">
+          <div class="flex flex-col md:flex-row items-center justify-between">
+            <div class="text-center md:text-left w-full">
+              <p class="text-gray-500 text-xs md:text-sm mb-1">Hadir</p>
+              <p class="stat-number text-2xl md:text-3xl font-bold text-green-600" id="presentToday">
+                <span class="skeleton inline-block w-16 h-8 rounded">0</span>
+              </p>
+            </div>
+            <span class="text-2xl md:text-4xl mt-2 md:mt-0">✅</span>
+          </div>
+        </div>
+        
+        <!-- Terlambat -->
+        <div class="stat-card bg-white rounded-xl shadow-md p-4 md:p-6 fade-in">
+          <div class="flex flex-col md:flex-row items-center justify-between">
+            <div class="text-center md:text-left w-full">
+              <p class="text-gray-500 text-xs md:text-sm mb-1">Terlambat</p>
+              <p class="stat-number text-2xl md:text-3xl font-bold text-yellow-600" id="lateToday">
+                <span class="skeleton inline-block w-16 h-8 rounded">0</span>
+              </p>
+            </div>
+            <span class="text-2xl md:text-4xl mt-2 md:mt-0">⏰</span>
+          </div>
+        </div>
+        
+        <!-- Tidak Hadir -->
+        <div class="stat-card bg-white rounded-xl shadow-md p-4 md:p-6 fade-in">
+          <div class="flex flex-col md:flex-row items-center justify-between">
+            <div class="text-center md:text-left w-full">
+              <p class="text-gray-500 text-xs md:text-sm mb-1">Absen</p>
+              <p class="stat-number text-2xl md:text-3xl font-bold text-red-600" id="absentToday">
+                <span class="skeleton inline-block w-16 h-8 rounded">0</span>
+              </p>
+            </div>
+            <span class="text-2xl md:text-4xl mt-2 md:mt-0">❌</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Charts (Lazy Loaded) -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
+        <div class="bg-white rounded-xl shadow-md p-4 md:p-6">
+          <h3 class="text-lg md:text-xl font-bold mb-4">Statistik Mingguan</h3>
+          <div id="weeklyChartContainer">
+            <div class="skeleton h-64 rounded"></div>
+          </div>
+          <canvas id="weeklyChart" class="hidden"></canvas>
+        </div>
+        
+        <div class="bg-white rounded-xl shadow-md p-4 md:p-6">
+          <h3 class="text-lg md:text-xl font-bold mb-4">Kehadiran Bulanan</h3>
+          <div id="monthlyChartContainer">
+            <div class="skeleton h-64 rounded"></div>
+          </div>
+          <canvas id="monthlyChart" class="hidden"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========== EMPLOYEES TAB ========== -->
+    <div id="employees" class="tab-content hidden">
+      <div class="bg-white rounded-xl shadow-md p-4 md:p-6">
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 md:mb-6 gap-3">
+          <h2 class="text-xl md:text-2xl font-bold">Manajemen Karyawan</h2>
+          <button id="addEmployeeBtn" class="w-full md:w-auto bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg text-sm md:text-base transition">
+            ➕ Tambah Karyawan
+          </button>
+        </div>
+
+        <!-- Add Employee Form (Hidden) -->
+        <div id="addEmployeeForm" class="hidden mb-6 p-4 bg-gray-50 rounded-lg">
+          <h3 class="font-semibold mb-3 text-sm md:text-base">Registrasi Karyawan Baru</h3>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
+            <input type="text" id="empName" placeholder="Nama Lengkap" class="px-3 md:px-4 py-2 md:py-3 border rounded-lg text-sm md:text-base">
+            <input type="text" id="empId" placeholder="ID Karyawan" class="px-3 md:px-4 py-2 md:py-3 border rounded-lg text-sm md:text-base">
+            <input type="email" id="empEmail" placeholder="Email" class="px-3 md:px-4 py-2 md:py-3 border rounded-lg text-sm md:text-base">
+            <input type="text" id="empDept" placeholder="Departemen" class="px-3 md:px-4 py-2 md:py-3 border rounded-lg text-sm md:text-base">
+          </div>
+          
+          <!-- Video Container -->
+          <div class="mt-4">
+            <div class="relative w-full max-w-xl mx-auto">
+              <video id="captureVideo" class="hidden w-full rounded-lg border-4 border-blue-500" autoplay playsinline></video>
+              <canvas id="captureCanvas" class="hidden absolute top-0 left-0 w-full h-full"></canvas>
+            </div>
+            <p id="captureStatus" class="text-center text-xs md:text-sm text-gray-500 mt-2"></p>
+          </div>
+
+          <div class="mt-4 flex flex-col md:flex-row gap-2">
+            <button id="capturePhotoBtn" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg text-sm md:text-base transition">
+              📸 Ambil Foto Wajah
+            </button>
+            <button id="saveEmployeeBtn" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg text-sm md:text-base transition" disabled>
+              💾 Simpan
+            </button>
+            <button id="cancelAddBtn" class="bg-gray-400 hover:bg-gray-500 text-white px-4 py-2 rounded-lg text-sm md:text-base transition">
+              ❌ Batal
+            </button>
+          </div>
+        </div>
+
+        <!-- Employee List (Mobile Optimized) -->
+        <div class="overflow-x-auto -mx-4 md:mx-0">
+          <table class="w-full text-xs md:text-base">
+            <thead class="bg-gray-50">
+              <tr>
+                <th class="px-2 md:px-4 py-2 md:py-3 text-left">Nama</th>
+                <th class="px-2 md:px-4 py-2 md:py-3 text-left mobile-hide">ID</th>
+                <th class="px-2 md:px-4 py-2 md:py-3 text-left mobile-hide">Dept</th>
+                <th class="px-2 md:px-4 py-2 md:py-3 text-left mobile-hide">Email</th>
+                <th class="px-2 md:px-4 py-2 md:py-3 text-left mobile-hide">Terdaftar</th>
+                <th class="px-2 md:px-4 py-2 md:py-3 text-center">Aksi</th>
+              </tr>
+            </thead>
+            <tbody id="employeeList">
+              <tr><td colspan="6" class="text-center py-4 text-gray-500">Memuat data...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========== ATTENDANCE TAB ========== -->
+    <div id="attendance" class="tab-content hidden">
+      <div class="bg-white rounded-xl shadow-md p-4 md:p-6">
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 md:mb-6 gap-3">
+          <h2 class="text-xl md:text-2xl font-bold">Data Absensi</h2>
+          <div class="flex flex-col md:flex-row gap-2 w-full md:w-auto">
+            <input type="date" id="filterDate" class="px-3 md:px-4 py-2 border rounded-lg text-sm md:text-base">
+            <select id="filterType" class="px-3 md:px-4 py-2 border rounded-lg text-sm md:text-base">
+              <option value="all">Semua</option>
+              <option value="check-in">Masuk</option>
+              <option value="check-out">Pulang</option>
+            </select>
+            <button id="filterBtn" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg text-sm md:text-base transition">
+              🔍 Filter
+            </button>
+            <button id="resetFilterBtn" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg text-sm md:text-base transition">
+              🔄 Reset
+            </button>
+          </div>
+        </div>
+
+        <div class="overflow-x-auto -mx-4 md:mx-0">
+          <table class="w-full text-xs md:text-base">
+            <thead class="bg-gray-50">
+              <tr>
+                <th class="px-2 md:px-4 py-2 md:py-3 text-left">Tanggal</th>
+                <th class="px-2 md:px-4 py-2 md:py-3 text-left">Nama</th>
+                <th class="px-2 md:px-4 py-2 md:py-3 text-left">Tipe</th>
+                <th class="px-2 md:px-4 py-2 md:py-3 text-left">Waktu</th>
+                <th class="px-2 md:px-4 py-2 md:py-3 text-left mobile-hide">Lokasi</th>
+                <th class="px-2 md:px-4 py-2 md:py-3 text-center mobile-hide">Status</th>
+              </tr>
+            </thead>
+            <tbody id="attendanceList">
+              <tr><td colspan="6" class="text-center py-4 text-gray-500">Memuat data...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========== REPORTS TAB ========== -->
+    <div id="reports" class="tab-content hidden">
+      <div class="bg-white rounded-xl shadow-md p-4 md:p-6">
+        <h2 class="text-xl md:text-2xl font-bold mb-4 md:mb-6">Laporan Absensi</h2>
+        
+        <!-- Report Filters (Mobile Optimized) -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4 mb-4 md:mb-6">
+          <div>
+            <label class="block text-xs md:text-sm font-medium mb-2">Periode</label>
+            <select id="reportPeriod" class="w-full px-3 md:px-4 py-2 border rounded-lg text-sm md:text-base">
+              <option value="daily">Harian</option>
+              <option value="weekly">Mingguan</option>
+              <option value="monthly">Bulanan</option>
+              <option value="custom">Custom</option>
+            </select>
+          </div>
+          
+          <div>
+            <label class="block text-xs md:text-sm font-medium mb-2">Dari Tanggal</label>
+            <input type="date" id="reportStartDate" class="w-full px-3 md:px-4 py-2 border rounded-lg text-sm md:text-base">
+          </div>
+          
+          <div>
+            <label class="block text-xs md:text-sm font-medium mb-2">Sampai Tanggal</label>
+            <input type="date" id="reportEndDate" class="w-full px-3 md:px-4 py-2 border rounded-lg text-sm md:text-base">
+          </div>
+        </div>
+
+        <!-- Export Buttons (Mobile Stack) -->
+        <div class="flex flex-col md:flex-row gap-2 md:gap-3 mb-4 md:mb-6">
+          <button id="generateReportBtn" class="bg-blue-500 hover:bg-blue-600 text-white px-4 md:px-6 py-2 rounded-lg text-sm md:text-base transition">
+            📊 Generate Laporan
+          </button>
+          <button id="exportExcelBtn" class="bg-green-500 hover:bg-green-600 text-white px-4 md:px-6 py-2 rounded-lg text-sm md:text-base transition">
+            📥 Export Excel
+          </button>
+          <button id="exportPdfBtn" class="bg-red-500 hover:bg-red-600 text-white px-4 md:px-6 py-2 rounded-lg text-sm md:text-base transition">
+            📄 Export PDF
+          </button>
+        </div>
+
+        <!-- Report Summary -->
+        <div id="reportSummary" class="hidden">
+          <h3 class="text-base md:text-lg font-bold mb-4">Ringkasan Laporan</h3>
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-4 md:mb-6">
+            <div class="bg-blue-50 p-3 md:p-4 rounded-lg">
+              <p class="text-xs md:text-sm text-gray-600">Total Hari Kerja</p>
+              <p class="text-xl md:text-2xl font-bold" id="totalWorkDays">0</p>
+            </div>
+            <div class="bg-green-50 p-3 md:p-4 rounded-lg">
+              <p class="text-xs md:text-sm text-gray-600">Rata-rata Kehadiran</p>
+              <p class="text-xl md:text-2xl font-bold" id="avgAttendance">0%</p>
+            </div>
+            <div class="bg-yellow-50 p-3 md:p-4 rounded-lg">
+              <p class="text-xs md:text-sm text-gray-600">Total Keterlambatan</p>
+              <p class="text-xl md:text-2xl font-bold" id="totalLate">0</p>
+            </div>
+            <div class="bg-red-50 p-3 md:p-4 rounded-lg">
+              <p class="text-xs md:text-sm text-gray-600">Total Absen</p>
+              <p class="text-xl md:text-2xl font-bold" id="totalAbsent">0</p>
+            </div>
+          </div>
+
+          <!-- Report Table -->
+          <div class="overflow-x-auto -mx-4 md:mx-0">
+            <table class="w-full text-xs md:text-base" id="reportTable">
+              <thead class="bg-gray-50">
+                <tr>
+                  <th class="px-2 md:px-4 py-2 md:py-3 text-left">Nama</th>
+                  <th class="px-2 md:px-4 py-2 md:py-3 text-center">Hadir</th>
+                  <th class="px-2 md:px-4 py-2 md:py-3 text-center mobile-hide">Terlambat</th>
+                  <th class="px-2 md:px-4 py-2 md:py-3 text-center mobile-hide">Absen</th>
+                  <th class="px-2 md:px-4 py-2 md:py-3 text-center">% Kehadiran</th>
+                  <th class="px-2 md:px-4 py-2 md:py-3 text-center mobile-hide">Total Jam</th>
+                </tr>
+              </thead>
+              <tbody id="reportTableBody">
+                <!-- Filled dynamically -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================== -->
+  <!-- 🔐 AUTH GUARD (Non-blocking) -->
+  <!-- ============================== -->
   <script type="module">
     import { waitForAdminAuth } from './admin-auth.js';
 
     let currentUser = null;
 
-    // Check authentication
-    waitForAdminAuth().then(user => {
-      if (user) {
-        currentUser = user;
-        console.log('✅ Admin authenticated:', user.email);
+    // Non-blocking auth check
+    (async () => {
+      try {
+        const user = await waitForAdminAuth();
         
-        // Update UI
-        setTimeout(() => {
+        if (user) {
+          currentUser = user;
+          console.log('✅ Admin authenticated:', user.email);
+          
+          // Update UI
           const userEmailElement = document.getElementById('userEmail');
           if (userEmailElement) {
             userEmailElement.textContent = user.email;
           }
-        }, 100);
-      } else {
-        console.log('❌ Not authenticated, redirecting to login...');
+        } else {
+          console.log('❌ Not authenticated, redirecting...');
+          window.location.href = 'login.html';
+        }
+      } catch (error) {
+        console.error('Auth error:', error);
         window.location.href = 'login.html';
       }
-    });
+    })();
 
     // Monitor auth state changes
-    window.adminAuth.onAuthStateChanged((user) => {
+    window.adminAuth?.onAuthStateChanged((user) => {
       if (!user && window.location.pathname.includes('admin.html')) {
-        console.log('🔄 Auth state changed - user logged out');
+        console.log('🔄 User logged out');
         window.location.href = 'login.html';
       }
     });
@@ -109,392 +574,1163 @@
       }
     };
 
-    // Export untuk digunakan di script lain
     window.getCurrentUser = () => currentUser;
     window.firebaseAuthReady = true;
   </script>
   
   <!-- ============================== -->
-  <!-- Firebase Database untuk Storage -->
+  <!-- Firebase (Lazy Load) -->
   <!-- ============================== -->
-  <script type="module" src="firebase-config.js"></script>
-  <script src="storage-firebase.js"></script>
-
-  <!-- ============================== -->
-  <!-- STYLES -->
-  <!-- ============================== -->
-  <style>
-    .loader {
-      border: 8px solid #f3f3f3;
-      border-radius: 50%;
-      border-top: 8px solid #3498db;
-      width: 60px;
-      height: 60px;
-      animation: spin 2s linear infinite;
-    }
-    @keyframes spin {
-      0% { transform: rotate(0deg);}
-      100% { transform: rotate(360deg);}
-    }
-    .tab-active {
-      background: linear-gradient(to right, #3b82f6, #6366f1);
-      color: #fff;
-    }
-    @keyframes pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.5; }
-    }
-    .pulse {
-      animation: pulse 2s ease-in-out infinite;
-    }
-  </style>
-</head>
-
-<body class="bg-gray-100">
-
-  <!-- Loader -->
-  <div id="loader-container" class="fixed inset-0 bg-white bg-opacity-90 flex flex-col justify-center items-center z-50">
-    <div class="loader"></div>
-    <p id="loader-text" class="mt-4 text-lg font-semibold">Memuat dashboard...</p>
-    <p id="loader-status" class="mt-2 text-sm text-gray-500">Menginisialisasi...</p>
-  </div>
-
-  <!-- Modal konfirmasi -->
-  <div id="modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-    <div class="bg-white p-6 rounded-lg shadow-xl max-w-md w-full mx-4">
-      <h3 id="modalTitle" class="text-xl font-bold mb-4"></h3>
-      <div id="modalContent"></div>
-      <div class="flex justify-end gap-2 mt-4">
-        <button id="modalCancel" class="px-4 py-2 bg-gray-300 hover:bg-gray-400 rounded-lg">Batal</button>
-        <button id="modalConfirm" class="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg">OK</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Alert Modal -->
-  <div id="alertModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-    <div class="bg-white p-6 rounded-lg shadow-xl max-w-md w-full mx-4">
-      <div id="alertIcon" class="text-6xl text-center mb-4">✅</div>
-      <h3 id="alertTitle" class="text-xl font-bold mb-2 text-center"></h3>
-      <p id="alertMessage" class="text-gray-600 text-center mb-4"></p>
-      <div class="flex justify-center">
-        <button id="alertClose" class="px-6 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg">OK</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Header -->
-  <header class="bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg">
-    <div class="container mx-auto px-4 py-6">
-      <div class="flex justify-between items-center">
-        <!-- Left: Title with Home Button -->
-        <div class="flex items-center gap-4">
-          <a href="index.html" class="text-white hover:text-blue-100 transition-colors duration-200 flex-shrink-0" title="Kembali ke Home">
-            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
-            </svg>
-          </a>
-          <div>
-            <h1 class="text-3xl font-bold">Dashboard Admin</h1>
-            <p class="text-blue-100 text-sm mt-1">Sistem Manajemen Absensi Karyawan</p>
-          </div>
-        </div>
-        
-        <!-- Right: User Info, Network Status & Logout -->
-        <div class="text-right">
-          <!-- Network Status -->
-          <div id="networkStatusHeader" class="inline-flex items-center gap-2 bg-white bg-opacity-20 px-3 py-1 rounded-full text-xs mb-2">
-            <span id="networkIconHeader" class="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
-            <span id="networkTextHeader">Online</span>
-          </div>
-          
-          <div class="flex items-center gap-3 mb-2">
-            <div class="text-right">
-              <p class="text-sm text-blue-100">Logged in as:</p>
-              <p class="text-base font-semibold" id="userEmail">Loading...</p>
-            </div>
-            <button 
-              onclick="handleLogout()" 
-              class="bg-white bg-opacity-20 hover:bg-opacity-30 px-4 py-2 rounded-lg text-sm transition duration-200 flex items-center gap-2"
-              title="Logout dari dashboard"
-            >
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
-              </svg>
-              <span class="hidden sm:inline">Logout</span>
-            </button>
-          </div>
-          <p class="text-lg font-semibold" id="currentDateTime">Loading...</p>
-        </div>
-      </div>
-    </div>
-  </header>
-
-  <!-- Navigasi -->
-  <div class="bg-white shadow-md sticky top-0 z-10">
-    <div class="container mx-auto px-4 flex gap-1 overflow-x-auto">
-      <button class="tab px-6 py-3 rounded-t-lg tab-active" data-tab="overview">📊 Overview</button>
-      <button class="tab px-6 py-3 rounded-t-lg hover:bg-gray-100" data-tab="employees">👥 Karyawan</button>
-      <button class="tab px-6 py-3 rounded-t-lg hover:bg-gray-100" data-tab="attendance">📋 Data Absensi</button>
-      <button class="tab px-6 py-3 rounded-t-lg hover:bg-gray-100" data-tab="reports">📈 Laporan</button>
-    </div>
-  </div>
-
-  <!-- Content -->
-  <div class="container mx-auto px-4 py-8">
-            
-    <!-- Overview Tab -->
-    <div id="overview" class="tab-content">
-      <!-- Statistics Cards -->
-      <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-        <div class="bg-white rounded-xl shadow-md p-6">
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="text-gray-500 text-sm">Total Karyawan</p>
-              <p class="text-3xl font-bold text-gray-800" id="totalEmployees">0</p>
-            </div>
-            <span class="text-4xl">👥</span>
-          </div>
-        </div>
-                    
-        <div class="bg-white rounded-xl shadow-md p-6">
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="text-gray-500 text-sm">Hadir Hari Ini</p>
-              <p class="text-3xl font-bold text-green-600" id="presentToday">0</p>
-            </div>
-            <span class="text-4xl">✅</span>
-          </div>
-        </div>
-                    
-        <div class="bg-white rounded-xl shadow-md p-6">
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="text-gray-500 text-sm">Terlambat</p>
-              <p class="text-3xl font-bold text-yellow-600" id="lateToday">0</p>
-            </div>
-            <span class="text-4xl">⏰</span>
-          </div>
-        </div>
-                    
-        <div class="bg-white rounded-xl shadow-md p-6">
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="text-gray-500 text-sm">Tidak Hadir</p>
-              <p class="text-3xl font-bold text-red-600" id="absentToday">0</p>
-            </div>
-            <span class="text-4xl">❌</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Charts -->
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div class="bg-white rounded-xl shadow-md p-6">
-          <h3 class="text-xl font-bold mb-4">Statistik Mingguan</h3>
-          <canvas id="weeklyChart"></canvas>
-        </div>
-                    
-        <div class="bg-white rounded-xl shadow-md p-6">
-          <h3 class="text-xl font-bold mb-4">Kehadiran Bulanan</h3>
-          <canvas id="monthlyChart"></canvas>
-        </div>
-      </div>
-    </div>
-
-    <!-- ... (rest of the tabs remain the same) ... -->
-    
-  </div>
-
-  <!-- Network Status Monitor Script -->
+  <script type="module">
+    // Import Firebase modules
+    import('./firebase-config.js').then(() => {
+      console.log('✅ Firebase config loaded');
+    });
+  </script>
+  
   <script>
-    function updateNetworkStatusHeader() {
-      const networkIconHeader = document.getElementById('networkIconHeader');
-      const networkTextHeader = document.getElementById('networkTextHeader');
-      const networkStatusHeader = document.getElementById('networkStatusHeader');
+    // Load storage-firebase.js lazily
+    const storageScript = document.createElement('script');
+    storageScript.src = 'storage-firebase.js';
+    storageScript.async = true;
+    document.head.appendChild(storageScript);
+  </script>
+
+  <!-- ============================== -->
+  <!-- MAIN SCRIPT (Optimized) -->
+  <!-- ============================== -->
+  <script>
+    // ===================================
+    // GLOBAL VARIABLES
+    // ===================================
+    let storage = null;
+    let isSystemReady = false;
+    let weeklyChart = null;
+    let monthlyChart = null;
+    let chartsLoaded = false;
+
+    // ===================================
+    // DOM ELEMENTS
+    // ===================================
+    const loaderContainer = document.getElementById('loader-container');
+    const loaderText = document.getElementById('loader-text');
+    const loaderStatus = document.getElementById('loader-status');
+    const modal = document.getElementById('modal');
+    const modalTitle = document.getElementById('modalTitle');
+    const modalContent = document.getElementById('modalContent');
+    const modalCancel = document.getElementById('modalCancel');
+    const modalConfirm = document.getElementById('modalConfirm');
+    const alertModal = document.getElementById('alertModal');
+    const alertIcon = document.getElementById('alertIcon');
+    const alertTitle = document.getElementById('alertTitle');
+    const alertMessage = document.getElementById('alertMessage');
+    const alertClose = document.getElementById('alertClose');
+    const currentDateTime = document.getElementById('currentDateTime');
+
+    // ===================================
+    // UTILITY FUNCTIONS
+    // ===================================
+    function showAlert(title, message, icon = '✅') {
+      alertTitle.textContent = title;
+      alertMessage.textContent = message;
+      alertIcon.textContent = icon;
+      alertModal.classList.remove('hidden');
+    }
+
+    alertClose.addEventListener('click', () => {
+      alertModal.classList.add('hidden');
+    });
+
+    function showModal(title, content, onConfirm) {
+      modalTitle.textContent = title;
+      modalContent.innerHTML = content;
+      modal.classList.remove('hidden');
+      
+      modalConfirm.onclick = () => {
+        onConfirm();
+        modal.classList.add('hidden');
+      };
+    }
+
+    modalCancel.addEventListener('click', () => {
+      modal.classList.add('hidden');
+    });
+
+    // ===================================
+    // UPDATE DATE TIME
+    // ===================================
+    function updateDateTime() {
+      const now = new Date();
+      const options = { 
+        weekday: 'short', 
+        year: 'numeric', 
+        month: 'short', 
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      };
+      currentDateTime.textContent = now.toLocaleDateString('id-ID', options);
+    }
+    
+    setInterval(updateDateTime, 1000);
+    updateDateTime();
+
+    // ===================================
+    // NETWORK STATUS
+    // ===================================
+    function updateNetworkStatus() {
+      const icon = document.getElementById('networkIconHeader');
+      const text = document.getElementById('networkTextHeader');
+      const container = document.getElementById('networkStatusHeader');
+      
+      if (!icon || !text || !container) return;
       
       if (navigator.onLine) {
-        networkIconHeader.className = 'w-2 h-2 bg-green-400 rounded-full animate-pulse';
-        networkTextHeader.textContent = 'Online';
-        networkStatusHeader.className = 'inline-flex items-center gap-2 bg-white bg-opacity-20 px-3 py-1 rounded-full text-xs mb-2';
+        icon.className = 'w-2 h-2 bg-green-400 rounded-full animate-pulse';
+        text.textContent = 'Online';
       } else {
-        networkIconHeader.className = 'w-2 h-2 bg-red-400 rounded-full';
-        networkTextHeader.textContent = 'Offline';
-        networkStatusHeader.className = 'inline-flex items-center gap-2 bg-red-500 bg-opacity-90 px-3 py-1 rounded-full text-xs mb-2';
+        icon.className = 'w-2 h-2 bg-red-400 rounded-full';
+        text.textContent = 'Offline';
       }
     }
 
-    window.addEventListener('online', () => {
-      updateNetworkStatusHeader();
-      showToast('Koneksi kembali', '✅');
+    window.addEventListener('online', updateNetworkStatus);
+    window.addEventListener('offline', updateNetworkStatus);
+    updateNetworkStatus();
+
+    // ===================================
+    // TAB NAVIGATION
+    // ===================================
+    document.querySelectorAll('.tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        const tabName = tab.dataset.tab;
+        
+        // Update active tab
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('tab-active'));
+        tab.classList.add('tab-active');
+        
+        // Show content
+        document.querySelectorAll('.tab-content').forEach(content => {
+          content.classList.add('hidden');
+        });
+        document.getElementById(tabName).classList.remove('hidden');
+        
+        // Load data based on tab
+        if (tabName === 'overview') loadOverview();
+        if (tabName === 'employees') loadEmployees();
+        if (tabName === 'attendance') loadAttendance();
+      });
     });
 
-    window.addEventListener('offline', () => {
-      updateNetworkStatusHeader();
-      showToast('Mode offline - Beberapa fitur terbatas', '⚠️');
-    });
-
-    updateNetworkStatusHeader();
-
-    function showToast(message, icon = 'ℹ️') {
-      const toast = document.createElement('div');
-      toast.className = 'fixed bottom-4 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white px-6 py-3 rounded-lg shadow-lg z-50 flex items-center gap-2 transition-opacity duration-300';
-      toast.innerHTML = `<span>${icon}</span><span class="text-sm">${message}</span>`;
+    // ===================================
+    // LAZY LOAD CHARTS
+    // ===================================
+    async function loadChartJS() {
+      if (chartsLoaded) return true;
       
-      document.body.appendChild(toast);
+      try {
+        // Load Chart.js only when needed
+        if (typeof Chart === 'undefined') {
+          const script = document.createElement('script');
+          script.src = 'https://cdn.jsdelivr.net/npm/chart.js';
+          document.head.appendChild(script);
+          
+          await new Promise((resolve, reject) => {
+            script.onload = resolve;
+            script.onerror = reject;
+          });
+        }
+        
+        chartsLoaded = true;
+        console.log('✅ Chart.js loaded');
+        return true;
+      } catch (error) {
+        console.error('❌ Failed to load Chart.js:', error);
+        return false;
+      }
+    }
+
+    // ===================================
+    // LOAD OVERVIEW
+    // ===================================
+    async function loadOverview() {
+      if (!storage) {
+        console.warn('Storage not ready yet');
+        return;
+      }
+
+      try {
+        const users = await storage.getUsers();
+        const attendance = await storage.getAttendance();
+        const today = new Date().toDateString();
+        const todayAttendance = attendance.filter(a => {
+          const aDate = new Date(a.timestamp);
+          return aDate.toDateString() === today;
+        });
+        
+        // Update stats
+        document.getElementById('totalEmployees').textContent = users.length;
+        
+        const checkIns = todayAttendance.filter(a => a.type === 'check-in');
+        const uniqueCheckIns = [...new Set(checkIns.map(c => c.name))];
+        document.getElementById('presentToday').textContent = uniqueCheckIns.length;
+        
+        const late = checkIns.filter(a => {
+          const time = new Date(a.timestamp);
+          return time.getHours() > 9 || (time.getHours() === 9 && time.getMinutes() > 0);
+        });
+        document.getElementById('lateToday').textContent = late.length;
+        
+        const absent = users.length - uniqueCheckIns.length;
+        document.getElementById('absentToday').textContent = absent;
+
+        // Load charts lazily
+        await loadChartJS();
+        await createWeeklyChart();
+        await createMonthlyChart();
+      } catch (error) {
+        console.error('Error loading overview:', error);
+      }
+    }
+
+    // ===================================
+    // CREATE CHARTS
+    // ===================================
+    async function createWeeklyChart() {
+      if (!storage || !chartsLoaded) return;
+
+      try {
+        const canvas = document.getElementById('weeklyChart');
+        const container = document.getElementById('weeklyChartContainer');
+        
+        if (!canvas || !container) return;
+        
+        const ctx = canvas.getContext('2d');
+        const attendance = await storage.getAttendance();
+        
+        if (weeklyChart) {
+          weeklyChart.destroy();
+        }
+
+        const days = [];
+        const data = [];
+        for (let i = 6; i >= 0; i--) {
+          const date = new Date();
+          date.setDate(date.getDate() - i);
+          days.push(date.toLocaleDateString('id-ID', { weekday: 'short' }));
+          
+          const dayAttendance = attendance.filter(a => {
+            const aDate = new Date(a.timestamp);
+            return aDate.toDateString() === date.toDateString() && a.type === 'check-in';
+          });
+          
+          const uniqueNames = [...new Set(dayAttendance.map(a => a.name))];
+          data.push(uniqueNames.length);
+        }
+
+        // Hide skeleton, show canvas
+        container.classList.add('hidden');
+        canvas.classList.remove('hidden');
+
+        weeklyChart = new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels: days,
+            datasets: [{
+              label: 'Kehadiran',
+              data: data,
+              borderColor: 'rgb(59, 130, 246)',
+              backgroundColor: 'rgba(59, 130, 246, 0.1)',
+              tension: 0.4,
+              fill: true
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: {
+              legend: { display: false }
+            },
+            scales: {
+              y: {
+                beginAtZero: true,
+                ticks: {
+                  stepSize: 1
+                }
+              }
+            }
+          }
+        });
+      } catch (error) {
+        console.error('Error creating weekly chart:', error);
+      }
+    }
+
+    async function createMonthlyChart() {
+      if (!storage || !chartsLoaded) return;
+
+      try {
+        const canvas = document.getElementById('monthlyChart');
+        const container = document.getElementById('monthlyChartContainer');
+        
+        if (!canvas || !container) return;
+        
+        const ctx = canvas.getContext('2d');
+        const attendance = await storage.getAttendance();
+        const users = await storage.getUsers();
+        
+        if (monthlyChart) {
+          monthlyChart.destroy();
+        }
+        
+        const present = attendance.filter(a => {
+          const date = new Date(a.timestamp);
+          return date.getMonth() === new Date().getMonth() && a.type === 'check-in';
+        });
+        
+        const uniqueCheckIns = [...new Set(present.map(p => p.name))].length;
+        const workDays = 22;
+        const totalExpected = users.length * workDays;
+        const absent = totalExpected - present.length;
+
+        // Hide skeleton, show canvas
+        container.classList.add('hidden');
+        canvas.classList.remove('hidden');
+
+        monthlyChart = new Chart(ctx, {
+          type: 'doughnut',
+          data: {
+            labels: ['Hadir', 'Absen'],
+            datasets: [{
+              data: [present.length, Math.max(0, absent)],
+              backgroundColor: [
+                'rgba(34, 197, 94, 0.8)',
+                'rgba(239, 68, 68, 0.8)'
+              ],
+              borderWidth: 2,
+              borderColor: '#fff'
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: {
+              legend: {
+                position: 'bottom'
+              }
+            }
+          }
+        });
+      } catch (error) {
+        console.error('Error creating monthly chart:', error);
+      }
+    }
+
+    // ===================================
+    // LOAD EMPLOYEES
+    // ===================================
+    async function loadEmployees() {
+      if (!storage) return;
+
+      try {
+        const users = await storage.getUsers();
+        const employees = await storage.getEmployees();
+        const employeeList = document.getElementById('employeeList');
+        
+        if (users.length === 0) {
+          employeeList.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-gray-500">Belum ada karyawan terdaftar</td></tr>';
+          return;
+        }
+
+        employeeList.innerHTML = users.map(user => {
+          const emp = employees.find(e => e.name === user.label) || {};
+          const createdDate = user.createdAt ? new Date(user.createdAt).toLocaleDateString('id-ID') : '-';
+          
+          return `
+            <tr class="border-b hover:bg-gray-50">
+              <td class="px-2 md:px-4 py-2 md:py-3 font-medium">${user.label}</td>
+              <td class="px-2 md:px-4 py-2 md:py-3 mobile-hide">${emp.id || '-'}</td>
+              <td class="px-2 md:px-4 py-2 md:py-3 mobile-hide">${emp.department || '-'}</td>
+              <td class="px-2 md:px-4 py-2 md:py-3 mobile-hide">${emp.email || '-'}</td>
+              <td class="px-2 md:px-4 py-2 md:py-3 mobile-hide">${createdDate}</td>
+              <td class="px-2 md:px-4 py-2 md:py-3 text-center">
+                <button onclick="deleteEmployee('${user.id}', '${user.label}')" class="text-red-500 hover:text-red-700 font-medium text-xs md:text-sm">
+                  🗑️ <span class="mobile-hide">Hapus</span>
+                </button>
+              </td>
+            </tr>
+          `;
+        }).join('');
+      } catch (error) {
+        console.error('Error loading employees:', error);
+      }
+    }
+
+    // ===================================
+    // LOAD ATTENDANCE
+    // ===================================
+    async function loadAttendance(filtered = null) {
+      if (!storage) return;
+
+      try {
+        const attendance = filtered || await storage.getAttendance();
+        const attendanceList = document.getElementById('attendanceList');
+        
+        if (attendance.length === 0) {
+          attendanceList.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-gray-500">Belum ada data absensi</td></tr>';
+          return;
+        }
+
+        attendance.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+        
+        attendanceList.innerHTML = attendance.slice(0, 100).map(record => {
+          const date = new Date(record.timestamp);
+          const time = date.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+          const dateStr = date.toLocaleDateString('id-ID');
+          const type = record.type === 'check-in' ? 
+            '<span class="text-green-600 font-semibold">📥 <span class="mobile-hide">Masuk</span></span>' : 
+            '<span class="text-red-600 font-semibold">📤 <span class="mobile-hide">Pulang</span></span>';
+          
+          const location = record.location ? record.location.address : '-';
+          
+          let status = '<span class="text-green-600">✓</span>';
+          if (record.type === 'check-in' && (date.getHours() > 9 || (date.getHours() === 9 && date.getMinutes() > 0))) {
+            status = '<span class="text-yellow-600">⚠</span>';
+          }
+          
+          return `
+            <tr class="border-b hover:bg-gray-50">
+              <td class="px-2 md:px-4 py-2 md:py-3 text-xs md:text-sm">${dateStr}</td>
+              <td class="px-2 md:px-4 py-2 md:py-3 font-medium text-xs md:text-sm">${record.name}</td>
+              <td class="px-2 md:px-4 py-2 md:py-3 text-xs md:text-sm">${type}</td>
+              <td class="px-2 md:px-4 py-2 md:py-3 text-xs md:text-sm">${time}</td>
+              <td class="px-2 md:px-4 py-2 md:py-3 text-xs mobile-hide">${location}</td>
+              <td class="px-2 md:px-4 py-2 md:py-3 text-center mobile-hide">${status}</td>
+            </tr>
+          `;
+        }).join('');
+      } catch (error) {
+        console.error('Error loading attendance:', error);
+      }
+    }
+
+    // ===================================
+    // DELETE EMPLOYEE
+    // ===================================
+    window.deleteEmployee = async function(userId, name) {
+      showModal(
+        'Konfirmasi Hapus',
+        `<p>Apakah Anda yakin ingin menghapus <strong>${name}</strong>?</p><p class="text-sm text-red-600 mt-2">Data tidak dapat dikembalikan!</p>`,
+        async () => {
+          try {
+            await storage.deleteUser(userId);
+            showAlert('Berhasil', `Karyawan ${name} telah dihapus`, '✅');
+            await loadEmployees();
+            await loadOverview();
+          } catch (error) {
+            console.error('Error deleting employee:', error);
+            showAlert('Error', 'Gagal menghapus karyawan', '❌');
+          }
+        }
+      );
+    };
+
+    // ===================================
+    // EMPLOYEE MANAGEMENT (with face-api lazy load)
+    // ===================================
+    const addEmployeeBtn = document.getElementById('addEmployeeBtn');
+    const addEmployeeForm = document.getElementById('addEmployeeForm');
+    const captureVideo = document.getElementById('captureVideo');
+    const captureCanvas = document.getElementById('captureCanvas');
+    const capturePhotoBtn = document.getElementById('capturePhotoBtn');
+    const saveEmployeeBtn = document.getElementById('saveEmployeeBtn');
+    const cancelAddBtn = document.getElementById('cancelAddBtn');
+    const captureStatus = document.getElementById('captureStatus');
+
+    let tempFaceDescriptor = null;
+    let videoStream = null;
+    let faceApiLoaded = false;
+
+    async function loadFaceAPI() {
+      if (faceApiLoaded) return true;
+      
+      try {
+        loaderStatus.textContent = 'Memuat Face Recognition...';
+        
+        // Load face-api.js only when needed
+        if (typeof faceapi === 'undefined') {
+          const script = document.createElement('script');
+          script.src = 'https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js';
+          document.head.appendChild(script);
+          
+          await new Promise((resolve, reject) => {
+            script.onload = resolve;
+            script.onerror = reject;
+          });
+        }
+        
+        // Load models
+        const MODEL_URL = 'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@0.22.2/weights';
+        await Promise.all([
+          faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
+          faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
+          faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)
+        ]);
+        
+        faceApiLoaded = true;
+        console.log('✅ Face-API loaded');
+        return true;
+      } catch (error) {
+        console.error('❌ Failed to load Face-API:', error);
+        return false;
+      }
+    }
+
+    addEmployeeBtn?.addEventListener('click', async () => {
+      addEmployeeForm.classList.toggle('hidden');
+      if (!addEmployeeForm.classList.contains('hidden')) {
+        // Load face-api when opening form
+        await loadFaceAPI();
+        startCaptureVideo();
+      } else {
+        stopCaptureVideo();
+      }
+    });
+
+    cancelAddBtn?.addEventListener('click', () => {
+      addEmployeeForm.classList.add('hidden');
+      stopCaptureVideo();
+      resetForm();
+    });
+
+    function startCaptureVideo() {
+      captureStatus.textContent = 'Memulai kamera...';
+      navigator.mediaDevices.getUserMedia({ 
+        video: { 
+          width: { ideal: 640 },
+          height: { ideal: 480 }
+        } 
+      })
+      .then(stream => {
+        videoStream = stream;
+        captureVideo.srcObject = stream;
+        captureVideo.classList.remove('hidden');
+        captureStatus.textContent = 'Posisikan wajah di tengah kamera';
+      })
+      .catch(err => {
+        console.error('Camera error:', err);
+        captureStatus.textContent = 'Gagal mengakses kamera';
+        showAlert('Error', 'Tidak dapat mengakses kamera', '❌');
+      });
+    }
+
+    function stopCaptureVideo() {
+      if (videoStream) {
+        videoStream.getTracks().forEach(track => track.stop());
+        videoStream = null;
+      }
+      captureVideo.classList.add('hidden');
+      captureCanvas.classList.add('hidden');
+      captureStatus.textContent = '';
+    }
+
+    function resetForm() {
+      document.getElementById('empName').value = '';
+      document.getElementById('empId').value = '';
+      document.getElementById('empEmail').value = '';
+      document.getElementById('empDept').value = '';
+      tempFaceDescriptor = null;
+      saveEmployeeBtn.disabled = true;
+    }
+
+    capturePhotoBtn?.addEventListener('click', async () => {
+      if (!faceApiLoaded) {
+        showAlert('Error', 'Face Recognition belum siap', '⚠️');
+        return;
+      }
+      
+      try {
+        captureStatus.textContent = 'Mendeteksi wajah...';
+        
+        const detection = await faceapi.detectSingleFace(captureVideo, new faceapi.TinyFaceDetectorOptions())
+          .withFaceLandmarks()
+          .withFaceDescriptor();
+        
+        if (detection) {
+          tempFaceDescriptor = Array.from(detection.descriptor);
+          
+          const canvas = captureCanvas;
+          const displaySize = { width: captureVideo.videoWidth, height: captureVideo.videoHeight };
+          faceapi.matchDimensions(canvas, displaySize);
+          
+          const resizedDetections = faceapi.resizeResults(detection, displaySize);
+          const ctx = canvas.getContext('2d');
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          
+          faceapi.draw.drawDetections(canvas, resizedDetections);
+          faceapi.draw.drawFaceLandmarks(canvas, resizedDetections);
+          
+          canvas.classList.remove('hidden');
+          captureStatus.textContent = '✅ Wajah berhasil dideteksi!';
+          captureStatus.classList.add('text-green-600');
+          saveEmployeeBtn.disabled = false;
+        } else {
+          captureStatus.textContent = '❌ Wajah tidak terdeteksi. Coba lagi.';
+          captureStatus.classList.add('text-red-600');
+          saveEmployeeBtn.disabled = true;
+        }
+      } catch (error) {
+        console.error('Face detection error:', error);
+        captureStatus.textContent = '❌ Error mendeteksi wajah';
+        showAlert('Error', 'Gagal mendeteksi wajah', '❌');
+      }
+    });
+
+    saveEmployeeBtn?.addEventListener('click', async () => {
+      const name = document.getElementById('empName').value.trim();
+      const id = document.getElementById('empId').value.trim();
+      const email = document.getElementById('empEmail').value.trim();
+      const dept = document.getElementById('empDept').value.trim();
+      
+      if (!name) {
+        showAlert('Peringatan', 'Nama karyawan harus diisi', '⚠️');
+        return;
+      }
+
+      if (!tempFaceDescriptor) {
+        showAlert('Peringatan', 'Ambil foto wajah terlebih dahulu', '⚠️');
+        return;
+      }
+
+      try {
+        saveEmployeeBtn.disabled = true;
+        saveEmployeeBtn.textContent = '⏳ Menyimpan...';
+
+        await storage.addUser({
+          label: name,
+          descriptors: [tempFaceDescriptor]
+        });
+
+        await storage.saveEmployee({
+          name,
+          id,
+          email,
+          department: dept
+        });
+
+        showAlert('Berhasil', `Karyawan ${name} berhasil ditambahkan`, '✅');
+        
+        resetForm();
+        addEmployeeForm.classList.add('hidden');
+        stopCaptureVideo();
+        
+        await loadEmployees();
+        await loadOverview();
+      } catch (error) {
+        console.error('Error saving employee:', error);
+        showAlert('Error', 'Gagal menyimpan karyawan', '❌');
+        saveEmployeeBtn.disabled = false;
+        saveEmployeeBtn.textContent = '💾 Simpan';
+      }
+    });
+
+    // ===================================
+    // FILTER ATTENDANCE
+    // ===================================
+    document.getElementById('filterBtn')?.addEventListener('click', async () => {
+      const date = document.getElementById('filterDate').value;
+      const type = document.getElementById('filterType').value;
+      
+      try {
+        let attendance = await storage.getAttendance();
+        
+        if (date) {
+          attendance = attendance.filter(a => {
+            const aDate = new Date(a.timestamp);
+            return aDate.toDateString() === new Date(date).toDateString();
+          });
+        }
+        
+        if (type !== 'all') {
+          attendance = attendance.filter(a => a.type === type);
+        }
+        
+        await loadAttendance(attendance);
+      } catch (error) {
+        console.error('Error filtering attendance:', error);
+      }
+    });
+
+    document.getElementById('resetFilterBtn')?.addEventListener('click', () => {
+      document.getElementById('filterDate').value = '';
+      document.getElementById('filterType').value = 'all';
+      loadAttendance();
+    });
+
+    // ===================================
+    // REPORTS (Lazy load XLSX & jsPDF)
+    // ===================================
+    let xlsxLoaded = false;
+    let jsPDFLoaded = false;
+
+    async function loadXLSX() {
+      if (xlsxLoaded) return true;
+      
+      try {
+        if (typeof XLSX === 'undefined') {
+          const script = document.createElement('script');
+          script.src = 'https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js';
+          document.head.appendChild(script);
+          
+          await new Promise((resolve, reject) => {
+            script.onload = resolve;
+            script.onerror = reject;
+          });
+        }
+        
+        xlsxLoaded = true;
+        console.log('✅ XLSX loaded');
+        return true;
+      } catch (error) {
+        console.error('❌ Failed to load XLSX:', error);
+        return false;
+      }
+    }
+
+    async function loadJsPDF() {
+      if (jsPDFLoaded) return true;
+      
+      try {
+        if (typeof jspdf === 'undefined') {
+          // Load jsPDF
+          const script1 = document.createElement('script');
+          script1.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+          document.head.appendChild(script1);
+          
+          await new Promise((resolve, reject) => {
+            script1.onload = resolve;
+            script1.onerror = reject;
+          });
+          
+          // Load jsPDF-AutoTable
+          const script2 = document.createElement('script');
+          script2.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js';
+          document.head.appendChild(script2);
+          
+          await new Promise((resolve, reject) => {
+            script2.onload = resolve;
+            script2.onerror = reject;
+          });
+        }
+        
+        jsPDFLoaded = true;
+        console.log('✅ jsPDF loaded');
+        return true;
+      } catch (error) {
+        console.error('❌ Failed to load jsPDF:', error);
+        return false;
+      }
+    }
+
+    // Generate Report function (same as before, but with lazy loading)
+    async function generateReport(period, startDate, endDate) {
+      if (!storage) return;
+
+      try {
+        const attendance = await storage.getAttendance();
+        const users = await storage.getUsers();
+        
+        let start = new Date();
+        let end = new Date();
+        
+        if (period === 'daily') {
+          start.setHours(0, 0, 0, 0);
+          end.setHours(23, 59, 59, 999);
+        } else if (period === 'weekly') {
+          const day = start.getDay();
+          const diff = start.getDate() - day + (day === 0 ? -6 : 1);
+          start = new Date(start.setDate(diff));
+          start.setHours(0, 0, 0, 0);
+          end = new Date(start);
+          end.setDate(end.getDate() + 6);
+          end.setHours(23, 59, 59, 999);
+        } else if (period === 'monthly') {
+          start = new Date(start.getFullYear(), start.getMonth(), 1);
+          end = new Date(start.getFullYear(), start.getMonth() + 1, 0);
+          end.setHours(23, 59, 59, 999);
+        } else if (period === 'custom' && startDate && endDate) {
+          start = new Date(startDate);
+          start.setHours(0, 0, 0, 0);
+          end = new Date(endDate);
+          end.setHours(23, 59, 59, 999);
+        }
+        
+        function getWorkDays(startDate, endDate) {
+          let count = 0;
+          let curDate = new Date(startDate);
+          while (curDate <= endDate) {
+            const dayOfWeek = curDate.getDay();
+            if (dayOfWeek !== 0 && dayOfWeek !== 6) count++;
+            curDate.setDate(curDate.getDate() + 1);
+          }
+          return count;
+        }
+        
+        const actualWorkDays = getWorkDays(start, end);
+        
+        const filtered = attendance.filter(a => {
+          const date = new Date(a.timestamp);
+          return date >= start && date <= end;
+        });
+        
+        const reportData = users.map(user => {
+          const userAttendance = filtered.filter(a => a.name === user.label);
+          const checkIns = userAttendance.filter(a => a.type === 'check-in');
+          const checkOuts = userAttendance.filter(a => a.type === 'check-out');
+          
+          const userWorkDays = [...new Set(
+            checkIns.map(a => new Date(a.timestamp).toDateString())
+          )].length;
+          
+          const late = checkIns.filter(a => {
+            const time = new Date(a.timestamp);
+            return time.getHours() > 9 || (time.getHours() === 9 && time.getMinutes() > 0);
+          });
+          
+          let totalHours = 0;
+          const processedDates = new Set();
+          
+          checkIns.forEach(checkIn => {
+            const checkInDate = new Date(checkIn.timestamp);
+            const dateStr = checkInDate.toDateString();
+            
+            if (processedDates.has(dateStr)) return;
+            processedDates.add(dateStr);
+            
+            const checkOut = checkOuts.find(co => 
+              new Date(co.timestamp).toDateString() === dateStr
+            );
+            
+            if (checkOut) {
+              const checkOutDate = new Date(checkOut.timestamp);
+              const diff = checkOutDate - checkInDate;
+              const hours = diff / (1000 * 60 * 60);
+              totalHours += hours;
+            } else {
+              if (dateStr === new Date().toDateString()) {
+                const now = new Date();
+                const diff = now - checkInDate;
+                const hours = Math.min(diff / (1000 * 60 * 60), 9);
+                totalHours += hours;
+              } else {
+                totalHours += 8;
+              }
+            }
+          });
+          
+          const absentDays = Math.max(0, actualWorkDays - userWorkDays);
+          const attendanceRate = actualWorkDays > 0 ? 
+            ((userWorkDays / actualWorkDays) * 100) : 0;
+          
+          return {
+            name: user.label,
+            present: userWorkDays,
+            late: late.length,
+            absent: absentDays,
+            attendanceRate: attendanceRate.toFixed(1),
+            totalHours: totalHours.toFixed(1)
+          };
+        });
+        
+        document.getElementById('reportSummary').classList.remove('hidden');
+        document.getElementById('totalWorkDays').textContent = actualWorkDays;
+        
+        const avgAttendance = reportData.length > 0 ?
+          (reportData.reduce((sum, r) => sum + parseFloat(r.attendanceRate), 0) / reportData.length).toFixed(1) : 0;
+        document.getElementById('avgAttendance').textContent = avgAttendance + '%';
+        
+        document.getElementById('totalLate').textContent = 
+          reportData.reduce((sum, r) => sum + r.late, 0);
+        document.getElementById('totalAbsent').textContent = 
+          reportData.reduce((sum, r) => sum + r.absent, 0);
+        
+        const reportTableBody = document.getElementById('reportTableBody');
+        reportTableBody.innerHTML = reportData.map(r => `
+          <tr class="border-b hover:bg-gray-50">
+            <td class="px-2 md:px-4 py-2 md:py-3 font-medium text-xs md:text-sm">${r.name}</td>
+            <td class="px-2 md:px-4 py-2 md:py-3 text-center text-green-600 font-semibold text-xs md:text-sm">${r.present}</td>
+            <td class="px-2 md:px-4 py-2 md:py-3 text-center text-yellow-600 font-semibold mobile-hide">${r.late}</td>
+            <td class="px-2 md:px-4 py-2 md:py-3 text-center text-red-600 font-semibold mobile-hide">${r.absent}</td>
+            <td class="px-2 md:px-4 py-2 md:py-3 text-center font-medium text-xs md:text-sm">
+              <span class="${parseFloat(r.attendanceRate) >= 80 ? 'text-green-600' : 'text-red-600'}">
+                ${r.attendanceRate}%
+              </span>
+            </td>
+            <td class="px-2 md:px-4 py-2 md:py-3 text-center font-medium mobile-hide">${r.totalHours} jam</td>
+          </tr>
+        `).join('');
+        
+        window.currentReportData = reportData;
+        window.reportPeriodInfo = {
+          startDate: start.toLocaleDateString('id-ID'),
+          endDate: end.toLocaleDateString('id-ID'),
+          workDays: actualWorkDays
+        };
+      } catch (error) {
+        console.error('Error generating report:', error);
+        showAlert('Error', 'Gagal generate laporan', '❌');
+      }
+    }
+
+    // Export Excel
+    document.getElementById('exportExcelBtn')?.addEventListener('click', async () => {
+      if (!window.currentReportData) {
+        showAlert('Peringatan', 'Generate laporan terlebih dahulu!', '⚠️');
+        return;
+      }
+      
+      await loadXLSX();
+      
+      const periodInfo = window.reportPeriodInfo || {};
+      
+      const ws_data = [
+        ['LAPORAN ABSENSI KARYAWAN'],
+        [],
+        ['Periode:', `${periodInfo.startDate} - ${periodInfo.endDate}`],
+        ['Total Hari Kerja:', periodInfo.workDays],
+        ['Tanggal Export:', new Date().toLocaleDateString('id-ID')],
+        [],
+        ['Nama Karyawan', 'Hari Hadir', 'Keterlambatan', 'Hari Absen', 'Persentase Kehadiran', 'Total Jam Kerja']
+      ];
+      
+      window.currentReportData.forEach(r => {
+        ws_data.push([
+          r.name, 
+          r.present, 
+          r.late, 
+          r.absent, 
+          r.attendanceRate + '%', 
+          r.totalHours + ' jam'
+        ]);
+      });
+      
+      const ws = XLSX.utils.aoa_to_sheet(ws_data);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Laporan Absensi");
+      
+      const filename = `Laporan_Absensi_${periodInfo.startDate.replace(/\//g, '-')}.xlsx`;
+      XLSX.writeFile(wb, filename);
+      
+      showAlert('Berhasil', 'File Excel berhasil diunduh', '✅');
+    });
+
+    // Export PDF
+    document.getElementById('exportPdfBtn')?.addEventListener('click', async () => {
+      if (!window.currentReportData) {
+        showAlert('Peringatan', 'Generate laporan terlebih dahulu!', '⚠️');
+        return;
+      }
+
+      await loadJsPDF();
+
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+      const periodInfo = window.reportPeriodInfo || {};
+
+      doc.setFontSize(18);
+      doc.text('LAPORAN ABSENSI KARYAWAN', 105, 15, { align: 'center' });
+
+      doc.setFontSize(11);
+      doc.text(`Periode: ${periodInfo.startDate} - ${periodInfo.endDate}`, 14, 25);
+      doc.text(`Total Hari Kerja: ${periodInfo.workDays}`, 14, 32);
+      doc.text(`Tanggal Export: ${new Date().toLocaleDateString('id-ID')}`, 14, 39);
+
+      const tableData = window.currentReportData.map(r => [
+        r.name,
+        r.present,
+        r.late,
+        r.absent,
+        r.attendanceRate + '%',
+        r.totalHours + ' jam'
+      ]);
+
+      doc.autoTable({
+        startY: 45,
+        head: [['Nama', 'Hadir', 'Terlambat', 'Absen', '% Kehadiran', 'Total Jam']],
+        body: tableData,
+        theme: 'grid',
+        headStyles: { fillColor: [59, 130, 246] },
+        styles: { fontSize: 9 }
+      });
+
+      const filename = `Laporan_Absensi_${periodInfo.startDate.replace(/\//g, '-')}.pdf`;
+      doc.save(filename);
+      
+      showAlert('Berhasil', 'File PDF berhasil diunduh', '✅');
+    });
+
+    // Report controls
+    document.getElementById('reportPeriod')?.addEventListener('change', function() {
+      const startDateInput = document.getElementById('reportStartDate');
+      const endDateInput = document.getElementById('reportEndDate');
+      
+      if (this.value === 'custom') {
+        startDateInput.disabled = false;
+        endDateInput.disabled = false;
+      } else {
+        startDateInput.disabled = true;
+        endDateInput.disabled = true;
+        
+        const today = new Date();
+        
+        if (this.value === 'daily') {
+          startDateInput.value = today.toISOString().slice(0, 10);
+          endDateInput.value = today.toISOString().slice(0, 10);
+        } else if (this.value === 'weekly') {
+          const day = today.getDay();
+          const diff = today.getDate() - day + (day === 0 ? -6 : 1);
+          const monday = new Date(today.setDate(diff));
+          const sunday = new Date(monday);
+          sunday.setDate(sunday.getDate() + 6);
+          
+          startDateInput.value = monday.toISOString().slice(0, 10);
+          endDateInput.value = sunday.toISOString().slice(0, 10);
+        } else if (this.value === 'monthly') {
+          const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+          const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+          
+          startDateInput.value = firstDay.toISOString().slice(0, 10);
+          endDateInput.value = lastDay.toISOString().slice(0, 10);
+        }
+      }
+    });
+
+    document.getElementById('generateReportBtn')?.addEventListener('click', function() {
+      const period = document.getElementById('reportPeriod').value;
+      const startDate = document.getElementById('reportStartDate').value;
+      const endDate = document.getElementById('reportEndDate').value;
+      
+      generateReport(period, startDate, endDate);
+    });
+
+    // ===================================
+    // INITIALIZE APPLICATION
+    // ===================================
+    async function initialize() {
+      try {
+        loaderText.innerText = 'Memuat dashboard...';
+        loaderStatus.innerText = 'Menghubungkan ke Firebase...';
+        
+        // Wait for Firebase
+        let attempts = 0;
+        const maxAttempts = 30;
+        
+        while (typeof FirebaseStorageManager === 'undefined' && attempts < maxAttempts) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+          attempts++;
+        }
+        
+        if (typeof FirebaseStorageManager === 'undefined') {
+          throw new Error('FirebaseStorageManager tidak ditemukan');
+        }
+        
+        storage = new FirebaseStorageManager();
+        
+        if (storage.waitForConnection) {
+          loaderStatus.innerText = 'Menunggu koneksi...';
+          await storage.waitForConnection();
+        }
+        
+        console.log('✅ Storage initialized');
+
+        // Set default report dates
+        const today = new Date();
+        const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+        const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+        
+        document.getElementById('reportStartDate').value = firstDay.toISOString().slice(0, 10);
+        document.getElementById('reportEndDate').value = lastDay.toISOString().slice(0, 10);
+        document.getElementById('reportStartDate').disabled = true;
+        document.getElementById('reportEndDate').disabled = true;
+
+        isSystemReady = true;
+        
+        // Hide loader
+        loaderContainer.style.display = 'none';
+        
+        // Load initial data
+        await loadOverview();
+        
+        console.log('✅ Dashboard initialized');
+      } catch (error) {
+        console.error("❌ Init error:", error);
+        loaderText.innerText = 'Gagal memuat dashboard';
+        loaderStatus.innerText = error.message;
+        loaderStatus.classList.add('text-red-600');
+        
+        showAlert('Error', 'Gagal menginisialisasi dashboard: ' + error.message, '❌');
+      }
+    }
+
+    // ===================================
+    // FIREBASE EVENT LISTENERS
+    // ===================================
+    window.addEventListener('firebaseReady', () => {
+      console.log('📢 Firebase ready event');
+      initialize();
+    });
+
+    // ===================================
+    // START APPLICATION
+    // ===================================
+    if (window.firebaseDB && window.firebaseDB.isReady) {
+      console.log('🚀 Firebase ready, initializing...');
+      initialize();
+    } else {
+      console.log('⏳ Waiting for Firebase...');
       
       setTimeout(() => {
-        toast.style.opacity = '0';
-        setTimeout(() => toast.remove(), 300);
-      }, 3000);
+        if (!isSystemReady) {
+          console.warn('⚠️ Timeout, initializing anyway');
+          initialize();
+        }
+      }, 15000);
     }
+
+    // ===================================
+    // ERROR HANDLING
+    // ===================================
+    window.addEventListener('unhandledrejection', (event) => {
+      console.error('❌ Unhandled promise rejection:', event.reason);
+      if (!isSystemReady) {
+        loaderText.innerText = 'Terjadi kesalahan';
+        loaderStatus.innerText = event.reason.message || 'Unknown error';
+        loaderStatus.classList.add('text-red-600');
+      }
+    });
   </script>
 
-  <!-- Main Script tetap sama seperti sebelumnya -->
+  <!-- PWA Service Worker -->
   <script>
-    // ... (semua script yang ada tetap sama) ...
-  </script>
-
-  <!-- PWA Service Worker Registration -->
-  <script>
-    // ============================================
-    // 🔄 SERVICE WORKER REGISTRATION
-    // ============================================
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', async () => {
         try {
-          const registration = await navigator.serviceWorker.register('/service-worker.js', {
-            scope: '/'
-          });
+          const registration = await navigator.serviceWorker.register('/service-worker.js');
+          console.log('✅ Service Worker registered');
           
-          console.log('✅ Service Worker registered:', registration.scope);
-          
-          // Check for updates
           registration.addEventListener('updatefound', () => {
             const newWorker = registration.installing;
-            
             newWorker.addEventListener('statechange', () => {
               if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                showUpdateNotification(registration);
+                console.log('🔄 New version available');
               }
             });
           });
-          
-          // Check for updates every hour
-          setInterval(() => {
-            registration.update();
-          }, 60 * 60 * 1000);
-          
         } catch (error) {
-          console.error('❌ Service Worker registration failed:', error);
+          console.error('❌ SW registration failed:', error);
         }
       });
-    }
-
-    // ============================================
-    // 🔔 UPDATE NOTIFICATION
-    // ============================================
-    function showUpdateNotification(registration) {
-      const banner = document.createElement('div');
-      banner.className = 'fixed top-20 right-4 bg-green-500 text-white p-4 rounded-lg shadow-2xl z-50 max-w-sm';
-      banner.innerHTML = `
-        <div class="flex items-center justify-between gap-4">
-          <div class="flex items-center gap-3">
-            <span class="text-2xl">🔄</span>
-            <div>
-              <p class="font-bold text-sm">Update Tersedia</p>
-              <p class="text-xs opacity-90">Versi baru aplikasi</p>
-            </div>
-          </div>
-          <button 
-            id="update-btn" 
-            class="bg-white text-green-600 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-green-50 transition">
-            Update
-          </button>
-        </div>
-      `;
-      
-      document.body.appendChild(banner);
-      
-      document.getElementById('update-btn').addEventListener('click', () => {
-        if (registration.waiting) {
-          registration.waiting.postMessage({ type: 'SKIP_WAITING' });
-          window.location.reload();
-        }
-      });
-    }
-
-    // ============================================
-    // 📱 INSTALL PROMPT (for desktop)
-    // ============================================
-    let deferredPrompt;
-    
-    window.addEventListener('beforeinstallprompt', (e) => {
-      e.preventDefault();
-      deferredPrompt = e;
-      
-      // Don't show if already dismissed
-      const dismissed = localStorage.getItem('pwa-install-dismissed');
-      if (dismissed) {
-        const hoursSince = (Date.now() - parseInt(dismissed)) / (1000 * 60 * 60);
-        if (hoursSince < 168) return; // 7 days
-      }
-      
-      // Show after 30 seconds
-      setTimeout(() => {
-        showInstallBanner();
-      }, 30000);
-    });
-
-    function showInstallBanner() {
-      const banner = document.createElement('div');
-      banner.id = 'install-banner';
-      banner.className = 'fixed bottom-4 right-4 bg-gradient-to-r from-blue-500 to-indigo-600 text-white p-4 rounded-lg shadow-2xl z-50 max-w-sm';
-      banner.innerHTML = `
-        <div class="flex items-center justify-between gap-4">
-          <div class="flex items-center gap-3">
-            <span class="text-3xl">📱</span>
-            <div>
-              <p class="font-bold text-sm">Install Dashboard</p>
-              <p class="text-xs opacity-90">Akses lebih cepat</p>
-            </div>
-          </div>
-          <div class="flex gap-2">
-            <button id="install-btn-admin" class="bg-white text-blue-600 px-4 py-2 rounded-lg text-sm font-semibold">
-              Install
-            </button>
-            <button id="dismiss-btn-admin" class="text-white hover:text-blue-100">
-              ✕
-            </button>
-          </div>
-        </div>
-      `;
-      
-      document.body.appendChild(banner);
-      
-      document.getElementById('install-btn-admin').addEventListener('click', async () => {
-        if (!deferredPrompt) return;
-        deferredPrompt.prompt();
-        const { outcome } = await deferredPrompt.userChoice;
-        deferredPrompt = null;
-        banner.remove();
-      });
-      
-      document.getElementById('dismiss-btn-admin').addEventListener('click', () => {
-        localStorage.setItem('pwa-install-dismissed', Date.now());
-        banner.remove();
-      });
-    }
-
-    window.addEventListener('appinstalled', () => {
-      console.log('✅ PWA installed');
-      showToast('Aplikasi berhasil diinstall! 🎉', '✅');
-    });
-
-    // Check if running as PWA
-    if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true) {
-      console.log('📱 Running in standalone mode');
     }
   </script>
 </body>
-</html>
+  </html>
