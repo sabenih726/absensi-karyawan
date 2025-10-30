@@ -1,5 +1,5 @@
 // ============================================
-// 💾 storage-firebase.js
+// 💾 storage-firebase.js - FIXED for Firestore
 // Firebase Storage Manager for Attendance System
 // ============================================
 
@@ -15,7 +15,6 @@ class FirebaseStorageManager {
   async init() {
     console.log('🔄 Initializing FirebaseStorageManager...');
     
-    // Wait for Firebase to be ready
     await this.waitForFirebase();
     
     this.db = window.firebaseDB.db;
@@ -58,6 +57,56 @@ class FirebaseStorageManager {
   }
 
   // ============================================
+  // 🔧 HELPER: Convert Nested Arrays for Firestore
+  // ============================================
+  
+  /**
+   * Convert nested arrays to Firestore-compatible format
+   * [array1, array2] => {0: array1, 1: array2}
+   */
+  convertDescriptorsToFirestore(descriptors) {
+    if (!Array.isArray(descriptors)) {
+      throw new Error('Descriptors must be an array');
+    }
+    
+    const firestoreDescriptors = {};
+    descriptors.forEach((desc, index) => {
+      // Convert to plain array if it's Float32Array
+      firestoreDescriptors[index.toString()] = Array.isArray(desc) 
+        ? desc 
+        : Array.from(desc);
+    });
+    
+    return {
+      data: firestoreDescriptors,
+      count: descriptors.length
+    };
+  }
+
+  /**
+   * Convert Firestore format back to nested arrays
+   * {0: array1, 1: array2} => [array1, array2]
+   */
+  convertDescriptorsFromFirestore(firestoreData) {
+    if (!firestoreData || !firestoreData.data) {
+      console.warn('⚠️ Invalid descriptor data');
+      return [];
+    }
+    
+    const descriptors = [];
+    const count = firestoreData.count || 0;
+    
+    for (let i = 0; i < count; i++) {
+      const desc = firestoreData.data[i.toString()];
+      if (desc) {
+        descriptors.push(desc);
+      }
+    }
+    
+    return descriptors;
+  }
+
+  // ============================================
   // 👥 USERS (Face Data)
   // ============================================
   
@@ -66,28 +115,67 @@ class FirebaseStorageManager {
       const usersRef = window.firebaseDB.collection(this.db, 'users');
       const snapshot = await window.firebaseDB.getDocs(usersRef);
       
-      return snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
+      if (snapshot.empty) {
+        console.warn('⚠️ Users collection is empty');
+        return [];
+      }
+      
+      const users = snapshot.docs.map(doc => {
+        const data = doc.data();
+        
+        // Convert descriptors from Firestore format
+        let descriptors = [];
+        if (data.descriptors) {
+          descriptors = this.convertDescriptorsFromFirestore(data.descriptors);
+        }
+        
+        return {
+          id: doc.id,
+          label: data.label,
+          descriptors: descriptors,
+          createdAt: data.createdAt
+        };
+      });
+      
+      console.log(`✅ Loaded ${users.length} users from database`);
+      return users;
+      
     } catch (error) {
-      console.error('Error getting users:', error);
+      console.error('❌ Error getting users:', error);
       return [];
     }
   }
 
   async addUser(userData) {
     try {
+      // Validate input
+      if (!userData.label) {
+        throw new Error('User label is required');
+      }
+      
+      if (!userData.descriptors || !Array.isArray(userData.descriptors)) {
+        throw new Error('User descriptors must be an array');
+      }
+      
+      if (userData.descriptors.length === 0) {
+        throw new Error('At least one descriptor is required');
+      }
+      
+      // Convert descriptors to Firestore-compatible format
+      const firestoreDescriptors = this.convertDescriptorsToFirestore(userData.descriptors);
+      
       const usersRef = window.firebaseDB.collection(this.db, 'users');
       const docRef = await window.firebaseDB.addDoc(usersRef, {
-        ...userData,
+        label: userData.label,
+        descriptors: firestoreDescriptors,
         createdAt: window.firebaseDB.serverTimestamp()
       });
       
       console.log('✅ User added:', docRef.id);
       return { success: true, id: docRef.id };
+      
     } catch (error) {
-      console.error('Error adding user:', error);
+      console.error('❌ Error adding user:', error);
       return { success: false, error: error.message };
     }
   }
@@ -100,7 +188,7 @@ class FirebaseStorageManager {
       console.log('✅ User deleted:', userId);
       return { success: true };
     } catch (error) {
-      console.error('Error deleting user:', error);
+      console.error('❌ Error deleting user:', error);
       return { success: false, error: error.message };
     }
   }
@@ -119,7 +207,7 @@ class FirebaseStorageManager {
         ...doc.data()
       }));
     } catch (error) {
-      console.error('Error getting employees:', error);
+      console.error('❌ Error getting employees:', error);
       return [];
     }
   }
@@ -135,7 +223,7 @@ class FirebaseStorageManager {
       console.log('✅ Employee saved:', docRef.id);
       return { success: true, id: docRef.id };
     } catch (error) {
-      console.error('Error saving employee:', error);
+      console.error('❌ Error saving employee:', error);
       return { success: false, error: error.message };
     }
   }
@@ -149,7 +237,8 @@ class FirebaseStorageManager {
       const attendanceRef = window.firebaseDB.collection(this.db, 'attendance');
       const q = window.firebaseDB.query(
         attendanceRef,
-        window.firebaseDB.orderBy('timestamp', 'desc')
+        window.firebaseDB.orderBy('timestamp', 'desc'),
+        window.firebaseDB.limit(1000) // Limit for performance
       );
       const snapshot = await window.firebaseDB.getDocs(q);
       
@@ -159,7 +248,7 @@ class FirebaseStorageManager {
         timestamp: doc.data().timestamp?.toDate?.() || new Date(doc.data().timestamp)
       }));
     } catch (error) {
-      console.error('Error getting attendance:', error);
+      console.error('❌ Error getting attendance:', error);
       return [];
     }
   }
@@ -184,7 +273,7 @@ class FirebaseStorageManager {
         timestamp: doc.data().timestamp?.toDate?.() || new Date(doc.data().timestamp)
       }));
     } catch (error) {
-      console.error('Error getting today attendance:', error);
+      console.error('❌ Error getting today attendance:', error);
       return [];
     }
   }
@@ -200,8 +289,52 @@ class FirebaseStorageManager {
       console.log('✅ Attendance added:', docRef.id);
       return { success: true, id: docRef.id };
     } catch (error) {
-      console.error('Error adding attendance:', error);
+      console.error('❌ Error adding attendance:', error);
       return { success: false, error: error.message };
+    }
+  }
+
+  // ============================================
+  // 🧪 DEBUG & TESTING
+  // ============================================
+  
+  async testConnection() {
+    try {
+      console.log('🧪 Testing Firestore connection...');
+      
+      const testRef = window.firebaseDB.collection(this.db, 'connection_test');
+      const docRef = await window.firebaseDB.addDoc(testRef, {
+        test: true,
+        timestamp: window.firebaseDB.serverTimestamp()
+      });
+      
+      await window.firebaseDB.deleteDoc(
+        window.firebaseDB.doc(this.db, 'connection_test', docRef.id)
+      );
+      
+      console.log('✅ Connection test passed');
+      return true;
+    } catch (error) {
+      console.error('❌ Connection test failed:', error);
+      return false;
+    }
+  }
+
+  async getDatabaseStats() {
+    try {
+      const users = await this.getUsers();
+      const employees = await this.getEmployees();
+      const attendance = await this.getAttendance();
+      
+      return {
+        users: users.length,
+        employees: employees.length,
+        attendance: attendance.length,
+        validUsers: users.filter(u => u.descriptors && u.descriptors.length > 0).length
+      };
+    } catch (error) {
+      console.error('❌ Error getting stats:', error);
+      return null;
     }
   }
 }
@@ -210,5 +343,12 @@ class FirebaseStorageManager {
 // 🌍 Global Export
 // ============================================
 window.FirebaseStorageManager = FirebaseStorageManager;
+
+// Auto-create instance if Firebase is ready
+if (window.firebaseDB && window.firebaseDB.isReady) {
+  console.log('✅ Auto-creating storage instance');
+  window.storageManager = new FirebaseStorageManager();
+}
+
 console.log('✅ storage-firebase.js loaded');
 console.log('📦 FirebaseStorageManager available globally');
