@@ -577,6 +577,39 @@
     window.getCurrentUser = () => currentUser;
     window.firebaseAuthReady = true;
   </script>
+
+  <script>
+    // ===================================
+    // PWA STATUS UPDATE
+    // ===================================
+    window.addEventListener('load', () => {
+      const statusIcon = document.getElementById('pwa-status-icon');
+      const statusText = document.getElementById('pwa-status-text');
+      
+      if (!statusIcon || !statusText) return;
+      
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistration().then(registration => {
+          if (registration) {
+            statusIcon.textContent = '✅';
+            statusText.textContent = 'PWA Active';
+            
+            // Check if running as app
+            if (window.matchMedia('(display-mode: standalone)').matches) {
+              statusIcon.textContent = '📱';
+              statusText.textContent = 'Running as App';
+            }
+          } else {
+            statusIcon.textContent = '⏳';
+            statusText.textContent = 'PWA Loading...';
+          }
+        });
+      } else {
+        statusIcon.textContent = '❌';
+        statusText.textContent = 'PWA not supported';
+      }
+    });
+  </script>
   
   <!-- ============================== -->
   <!-- Firebase (Lazy Load) -->
@@ -1710,27 +1743,16 @@
     });
   </script>
 
-  <!-- PWA Service Worker -->
-  <script>
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', async () => {
-        try {
-          const registration = await navigator.serviceWorker.register('/service-worker.js');
-          console.log('✅ Service Worker registered');
-          
-          registration.addEventListener('updatefound', () => {
-            const newWorker = registration.installing;
-            newWorker.addEventListener('statechange', () => {
-              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                console.log('🔄 New version available');
-              }
-            });
-          });
-        } catch (error) {
-          console.error('❌ SW registration failed:', error);
-        }
-      });
-    }
-  </script>
+  <!-- ============================== -->
+  <!-- PWA STATUS INDICATOR (Bottom Right) -->
+  <!-- ============================== -->
+  <div class="fixed bottom-4 right-4 bg-white px-3 py-2 rounded-lg shadow-lg text-xs text-gray-500 hidden md:flex items-center gap-2 z-50">
+    <span id="pwa-status-icon">⚙️</span>
+    <span id="pwa-status-text">PWA</span>
+  </div>
+
+  <!-- PWA Manager (Reusable Script) -->
+  <script src="/pwa-init.js"></script>
+
 </body>
-  </html>
+</html>
