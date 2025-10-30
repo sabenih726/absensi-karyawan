@@ -111,40 +111,65 @@ class FirebaseStorageManager {
   // ============================================
   
   async getUsers() {
-    try {
-      const usersRef = window.firebaseDB.collection(this.db, 'users');
-      const snapshot = await window.firebaseDB.getDocs(usersRef);
-      
-      if (snapshot.empty) {
-        console.warn('⚠️ Users collection is empty');
-        return [];
-      }
-      
-      const users = snapshot.docs.map(doc => {
-        const data = doc.data();
+      try {
+        const usersRef = window.firebaseDB.collection(this.db, 'users');
+        const snapshot = await window.firebaseDB.getDocs(usersRef);
         
-        // Convert descriptors from Firestore format
-        let descriptors = [];
-        if (data.descriptors) {
-          descriptors = this.convertDescriptorsFromFirestore(data.descriptors);
+        if (snapshot.empty) {
+          console.warn('⚠️ Users collection is empty');
+          return [];
         }
         
-        return {
-          id: doc.id,
-          label: data.label,
-          descriptors: descriptors,
-          createdAt: data.createdAt
-        };
-      });
-      
-      console.log(`✅ Loaded ${users.length} users from database`);
-      return users;
-      
-    } catch (error) {
-      console.error('❌ Error getting users:', error);
-      return [];
+        const users = snapshot.docs.map(doc => {
+          const data = doc.data();
+          
+          // Convert descriptors from Firestore format
+          let descriptors = [];
+          if (data.descriptors) {
+            descriptors = this.convertDescriptorsFromFirestore(data.descriptors);
+          }
+          
+          // Convert timestamp to Date object
+          let createdAt = null;
+          if (data.createdAt) {
+            try {
+              // Firestore Timestamp has toDate() method
+              if (data.createdAt.toDate && typeof data.createdAt.toDate === 'function') {
+                createdAt = data.createdAt.toDate();
+              }
+              // Handle timestamp object with seconds
+              else if (data.createdAt.seconds) {
+                createdAt = new Date(data.createdAt.seconds * 1000);
+              }
+              // Handle Date object
+              else if (data.createdAt instanceof Date) {
+                createdAt = data.createdAt;
+              }
+              // Handle timestamp number
+              else if (typeof data.createdAt === 'number') {
+                createdAt = new Date(data.createdAt);
+              }
+            } catch (error) {
+              console.warn('Error converting timestamp:', error);
+            }
+          }
+          
+          return {
+            id: doc.id,
+            label: data.label,
+            descriptors: descriptors,
+            createdAt: createdAt
+          };
+        });
+        
+        console.log(`✅ Loaded ${users.length} users from database`);
+        return users;
+        
+      } catch (error) {
+        console.error('❌ Error getting users:', error);
+        return [];
+      }
     }
-  }
 
   async addUser(userData) {
     try {
