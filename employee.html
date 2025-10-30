@@ -510,7 +510,7 @@
     }
 
     // ===================================
-    // LOAD FACE MATCHER
+    // LOAD FACE MATCHER (UPDATED for new format)
     // ===================================
     async function loadFaceMatcher() {
         if (!storage) {
@@ -522,19 +522,8 @@
             const users = await storage.getUsers();
             console.log('📥 Loaded users from database:', users);
             
-            // Check if users exist and is array
-            if (!users || !Array.isArray(users)) {
-                console.warn('⚠️ No users data or invalid format');
-                showAlert(
-                    'Data Karyawan Tidak Valid', 
-                    'Silakan hubungi admin untuk memperbaiki database', 
-                    '⚠️'
-                );
-                return;
-            }
-            
-            if (users.length === 0) {
-                console.warn('⚠️ Database kosong - belum ada karyawan terdaftar');
+            if (!users || users.length === 0) {
+                console.warn('⚠️ No users in database');
                 showAlert(
                     'Belum Ada Karyawan Terdaftar', 
                     'Silakan hubungi admin untuk mendaftarkan wajah Anda terlebih dahulu', 
@@ -543,18 +532,14 @@
                 return;
             }
             
-            // Filter users yang memiliki descriptors valid
+            // Filter valid users
             const validUsers = users.filter(user => {
                 if (!user.descriptors || !Array.isArray(user.descriptors)) {
-                    console.warn('⚠️ User tidak memiliki descriptors:', user);
+                    console.warn('⚠️ User has no valid descriptors:', user.label);
                     return false;
                 }
                 if (user.descriptors.length === 0) {
-                    console.warn('⚠️ User memiliki descriptors kosong:', user);
-                    return false;
-                }
-                if (!user.label) {
-                    console.warn('⚠️ User tidak memiliki label:', user);
+                    console.warn('⚠️ User has empty descriptors:', user.label);
                     return false;
                 }
                 return true;
@@ -563,10 +548,9 @@
             console.log(`✅ Valid users: ${validUsers.length} / ${users.length}`);
             
             if (validUsers.length === 0) {
-                console.error('❌ Tidak ada user dengan data wajah yang valid');
                 showAlert(
                     'Data Wajah Tidak Valid', 
-                    'Semua data karyawan tidak memiliki informasi wajah yang valid. Silakan hubungi admin.', 
+                    'Tidak ada karyawan dengan data wajah yang valid', 
                     '❌'
                 );
                 return;
@@ -574,59 +558,27 @@
             
             // Create labeled descriptors
             const labeledDescriptors = validUsers.map(user => {
-                try {
-                    // Convert descriptors to Float32Array
-                    const descriptors = user.descriptors.map(descriptor => {
-                        // Handle different descriptor formats
-                        if (descriptor instanceof Float32Array) {
-                            return descriptor;
-                        } else if (Array.isArray(descriptor)) {
-                            return new Float32Array(descriptor);
-                        } else if (typeof descriptor === 'object') {
-                            // Handle object format (from Firebase)
-                            return new Float32Array(Object.values(descriptor));
-                        } else {
-                            console.error('❌ Invalid descriptor format:', descriptor);
-                            return null;
-                        }
-                    }).filter(d => d !== null);
-                    
-                    if (descriptors.length === 0) {
-                        console.error('❌ No valid descriptors for user:', user.label);
-                        return null;
-                    }
-                    
-                    return new faceapi.LabeledFaceDescriptors(user.label, descriptors);
-                } catch (error) {
-                    console.error('❌ Error creating descriptor for user:', user.label, error);
-                    return null;
-                }
-            }).filter(d => d !== null);
-            
-            if (labeledDescriptors.length === 0) {
-                console.error('❌ Tidak ada descriptor yang valid setelah konversi');
-                showAlert(
-                    'Gagal Memuat Data Wajah', 
-                    'Tidak ada data wajah yang dapat digunakan. Silakan hubungi admin.', 
-                    '❌'
-                );
-                return;
-            }
+                const descriptors = user.descriptors.map(desc => {
+                    // Convert to Float32Array if needed
+                    return desc instanceof Float32Array ? desc : new Float32Array(desc);
+                });
+                
+                return new faceapi.LabeledFaceDescriptors(user.label, descriptors);
+            });
             
             // Create face matcher
             faceMatcher = new faceapi.FaceMatcher(labeledDescriptors, 0.6);
             console.log('✅ Face matcher initialized with', labeledDescriptors.length, 'users');
             
-            // Show success message
             if (voiceManager) {
-                voiceManager.speak(`Face recognition siap. ${labeledDescriptors.length} karyawan terdaftar.`);
+                voiceManager.speak(`Sistem siap. ${labeledDescriptors.length} karyawan terdaftar.`);
             }
             
         } catch (error) {
             console.error('❌ Error loading face matcher:', error);
             showAlert(
                 'Gagal Memuat Sistem Pengenalan Wajah',
-                'Terjadi kesalahan: ' + error.message,
+                error.message,
                 '❌'
             );
         }
@@ -978,4 +930,5 @@
 
 </body>
 </html>
+
 
