@@ -960,6 +960,96 @@
     }
 
     // ===================================
+    // UTILITY: Format Date Safely
+    // ===================================
+    function formatDate(timestamp, defaultValue = '-') {
+        if (!timestamp) return defaultValue;
+        
+        try {
+            let date;
+            
+            // Firestore Timestamp with toDate()
+            if (timestamp.toDate && typeof timestamp.toDate === 'function') {
+                date = timestamp.toDate();
+            }
+            // Firestore Timestamp object format {seconds, nanoseconds}
+            else if (timestamp.seconds !== undefined) {
+                date = new Date(timestamp.seconds * 1000);
+            }
+            // Already a Date object
+            else if (timestamp instanceof Date) {
+                date = timestamp;
+            }
+            // Unix timestamp (number)
+            else if (typeof timestamp === 'number') {
+                date = new Date(timestamp);
+            }
+            // ISO string
+            else if (typeof timestamp === 'string') {
+                date = new Date(timestamp);
+            }
+            else {
+                console.warn('Unknown timestamp format:', timestamp);
+                return defaultValue;
+            }
+            
+            // Validate date
+            if (isNaN(date.getTime())) {
+                console.warn('Invalid date:', timestamp);
+                return defaultValue;
+            }
+            
+            // Format date
+            return date.toLocaleDateString('id-ID', {
+                day: '2-digit',
+                month: 'short',
+                year: 'numeric'
+            });
+            
+        } catch (error) {
+            console.error('Error formatting date:', error);
+            return defaultValue;
+        }
+    }
+    
+    // Optional: Format with time
+    function formatDateTime(timestamp, defaultValue = '-') {
+        if (!timestamp) return defaultValue;
+        
+        try {
+            let date;
+            
+            if (timestamp.toDate && typeof timestamp.toDate === 'function') {
+                date = timestamp.toDate();
+            } else if (timestamp.seconds !== undefined) {
+                date = new Date(timestamp.seconds * 1000);
+            } else if (timestamp instanceof Date) {
+                date = timestamp;
+            } else if (typeof timestamp === 'number') {
+                date = new Date(timestamp);
+            } else if (typeof timestamp === 'string') {
+                date = new Date(timestamp);
+            } else {
+                return defaultValue;
+            }
+            
+            if (isNaN(date.getTime())) return defaultValue;
+            
+            return date.toLocaleString('id-ID', {
+                day: '2-digit',
+                month: 'short',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+            
+        } catch (error) {
+            console.error('Error formatting datetime:', error);
+            return defaultValue;
+        }
+    }
+    
+    // ===================================
     // LOAD EMPLOYEES (FIXED - Date Handling)
     // ===================================
     async function loadEmployees() {
@@ -978,39 +1068,8 @@
             employeeList.innerHTML = users.map(user => {
                 const emp = employees.find(e => e.name === user.label) || {};
                 
-                // Fix: Handle different timestamp formats
-                let createdDate = '-';
-                
-                if (user.createdAt) {
-                    try {
-                        // Check if it's a Firestore Timestamp
-                        if (user.createdAt.toDate && typeof user.createdAt.toDate === 'function') {
-                            createdDate = user.createdAt.toDate().toLocaleDateString('id-ID');
-                        } 
-                        // Check if it's already a Date object
-                        else if (user.createdAt instanceof Date) {
-                            createdDate = user.createdAt.toLocaleDateString('id-ID');
-                        }
-                        // Check if it's a timestamp number
-                        else if (typeof user.createdAt === 'number') {
-                            createdDate = new Date(user.createdAt).toLocaleDateString('id-ID');
-                        }
-                        // Check if it's a string
-                        else if (typeof user.createdAt === 'string') {
-                            const date = new Date(user.createdAt);
-                            if (!isNaN(date.getTime())) {
-                                createdDate = date.toLocaleDateString('id-ID');
-                            }
-                        }
-                        // Firestore Timestamp object format
-                        else if (user.createdAt.seconds) {
-                            createdDate = new Date(user.createdAt.seconds * 1000).toLocaleDateString('id-ID');
-                        }
-                    } catch (error) {
-                        console.warn('Error parsing date for user:', user.label, error);
-                        createdDate = 'N/A';
-                    }
-                }
+                // Use utility function
+                const createdDate = formatDate(user.createdAt);
                 
                 return `
                     <tr class="border-b hover:bg-gray-50">
@@ -1788,4 +1847,5 @@
 
 </body>
 </html>
+
 
