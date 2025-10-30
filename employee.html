@@ -1,37 +1,33 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Employee Portal – Attendance System</title>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Employee Portal – Attendance System</title>
+    
+    <!-- PWA Meta Tags -->
+    <meta name="theme-color" content="#FFA500">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Absensi">
+    <meta name="mobile-web-app-capable" content="yes">
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/manifest.json">
+    
+    <!-- Icons -->
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
+    <link rel="apple-touch-icon" href="/assets/logo-trakindo.png">
+    
+    <!-- Library - DIRECT LOAD (Original approach) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+    <!-- ☝️ KUNCI: Direct load, bukan lazy! -->
+    
+    <script type="module" src="firebase-config.js"></script>
+    <script src="storage-firebase.js"></script>
 
-  <!-- PWA Meta Tags -->
-  <meta name="theme-color" content="#3b82f6">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="Absensi">
-  <meta name="mobile-web-app-capable" content="yes">
-  <meta name="description" content="Employee attendance portal with face recognition and GPS tracking">
-  
-  <!-- PWA Manifest -->
-  <link rel="manifest" href="/manifest.json">
-  
-  <!-- Icons - PERBAIKAN PATH (Simplified) -->
-  <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
-  <link rel="icon" type="image/png" sizes="512x512" href="/icons/icon-512x512.png">
-  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
-  <link rel="shortcut icon" href="/icons/favicon.ico">
-
-  <!-- Library -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  
-  <!-- Face-API (Lazy Load - Loaded in JS) -->
-  <!-- <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script> -->
-  
-  <script type="module" src="firebase-config.js"></script>
-  <script src="storage-firebase.js"></script>
-
-    <!-- Style -->
+    <!-- Style (sama seperti original) -->
     <style>
         * {
             margin: 0;
@@ -43,7 +39,6 @@
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
 
-        /* Video Container */
         .relative-container {
             position: relative;
             width: 100%;
@@ -61,7 +56,6 @@
             object-fit: cover;
         }
 
-        /* Loader Animation */
         .loader {
             border: 8px solid #f3f3f3;
             border-radius: 50%;
@@ -76,7 +70,6 @@
             100% { transform: rotate(360deg); }
         }
 
-        /* Clock Styling */
         .clock {
             font-family: 'Courier New', monospace;
             font-size: 3rem;
@@ -84,7 +77,6 @@
             text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
         }
 
-        /* Custom Scrollbar */
         .custom-scrollbar::-webkit-scrollbar {
             width: 6px;
         }
@@ -99,11 +91,6 @@
             border-radius: 10px;
         }
 
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-            background: #555;
-        }
-
-        /* Responsive Clock */
         @media (max-width: 768px) {
             .clock {
                 font-size: 2rem;
@@ -120,156 +107,136 @@
 
 <body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen">
 
-    <!-- ========== LOADER ========== -->
-    <div id="loader-container" class="fixed inset-0 bg-white bg-opacity-90 flex flex-col justify-center items-center z-50">
-        <div class="loader"></div>
-        <p id="loader-text" class="mt-4 text-lg font-semibold text-gray-700">Memuat sistem...</p>
-    </div>
+<!-- Loader -->
+<div id="loader-container" class="fixed inset-0 bg-white bg-opacity-90 flex flex-col justify-center items-center z-50">
+    <div class="loader"></div>
+    <p id="loader-text" class="mt-4 text-lg font-semibold text-gray-700">Memuat sistem...</p>
+</div>
 
-    <!-- ========== MODAL ALERT ========== -->
-    <div id="alertModal" class="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 hidden">
-        <div class="bg-white p-8 rounded-2xl shadow-2xl text-center max-w-md w-full mx-4 transform transition-all">
-            <div id="alertIcon" class="text-6xl mb-4">✅</div>
-            <p id="alertMessage" class="text-xl font-bold mb-2 text-gray-800"></p>
-            <p id="alertDetail" class="text-gray-600 mb-6"></p>
-            <button id="alertClose" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-8 rounded-lg transition duration-300 transform hover:scale-105">
-                OK
+<!-- Alert Modal -->
+<div id="alertModal" class="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 hidden">
+    <div class="bg-white p-8 rounded-2xl shadow-2xl text-center max-w-md w-full mx-4 transform transition-all">
+        <div id="alertIcon" class="text-6xl mb-4">✅</div>
+        <p id="alertMessage" class="text-xl font-bold mb-2 text-gray-800"></p>
+        <p id="alertDetail" class="text-gray-600 mb-6"></p>
+        <button id="alertClose" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-8 rounded-lg transition duration-300 transform hover:scale-105">
+            OK
+        </button>
+    </div>
+</div>
+
+<!-- Main Container -->
+<div class="container mx-auto px-4 py-6 max-w-7xl">
+
+    <!-- Header -->
+    <header class="text-center mb-8">
+        <div class="mb-4 flex justify-center">
+            <a href="index.html" class="inline-flex items-center gap-2 bg-white px-4 py-2 rounded-lg shadow-md hover:shadow-lg transition duration-200 text-gray-700 hover:text-blue-600">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+                </svg>
+                <span class="font-medium">Kembali ke Home</span>
+            </a>
+        </div>
+
+        <h1 class="text-3xl md:text-4xl lg:text-5xl font-bold text-gray-800 mb-4">
+            Employee Attendance System
+        </h1>
+
+        <div id="clock" class="clock text-blue-600 my-4">00:00:00</div>
+        <div id="date" class="text-base md:text-lg text-gray-600 mb-4">Loading...</div>
+
+        <div id="networkStatus" class="inline-flex items-center gap-2 bg-green-100 text-green-700 px-4 py-2 rounded-full text-sm font-medium mb-4">
+            <span class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+            <span>Online</span>
+        </div>
+
+        <div class="inline-flex items-center gap-2 bg-white px-6 py-3 rounded-full shadow-lg border border-gray-200">
+            <span id="locationIcon" class="text-xl">📍</span>
+            <span id="locationText" class="text-sm md:text-base font-medium text-gray-700">
+                Mendapatkan lokasi...
+            </span>
+            <button id="refreshLocationBtn" onclick="updateLocation()" class="ml-2 p-2 hover:bg-gray-100 rounded-full transition duration-200" title="Perbarui lokasi">
+                <svg class="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                </svg>
             </button>
         </div>
-    </div>
+    </header>
 
-    <!-- ========== MAIN CONTAINER ========== -->
-    <div class="container mx-auto px-4 py-6 max-w-7xl">
+    <!-- Main Content -->
+    <main class="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
 
-        <!-- ========== HEADER ========== -->
-        <header class="text-center mb-8">
-            <!-- Back to Home Button -->
-            <div class="mb-4 flex justify-center">
-                <a href="index.html" 
-                   class="inline-flex items-center gap-2 bg-white px-4 py-2 rounded-lg shadow-md hover:shadow-lg transition duration-200 text-gray-700 hover:text-blue-600">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
-                    </svg>
-                    <span class="font-medium">Kembali ke Home</span>
-                </a>
+        <!-- Camera Section -->
+        <section class="bg-white rounded-2xl shadow-xl p-6 lg:p-8">
+            <h2 class="text-2xl font-bold mb-6 text-gray-800 flex items-center gap-2">
+                <span>📸</span>
+                <span>Kamera</span>
+            </h2>
+
+            <div class="relative-container rounded-xl overflow-hidden border-4 border-gray-200 shadow-inner mb-4">
+                <video id="video" autoplay muted playsinline></video>
+                <canvas id="canvas"></canvas>
             </div>
 
-            <h1 class="text-2xl md:text-3xl lg:text-4xl font-bold text-gray-800 mb-4">
-                Employee Attendance System
-            </h1>
-
-            <!-- Real-time Clock -->
-            <div id="clock" class="clock text-blue-600 my-4">00:00:00</div>
-            <div id="date" class="text-base md:text-lg text-gray-600 mb-4">Loading...</div>
-
-            <!-- Network Status Indicator -->
-            <div id="networkStatus" class="inline-flex items-center gap-2 bg-green-100 text-green-700 px-4 py-2 rounded-full text-sm font-medium mb-4">
-                <span class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-                <span>Online</span>
+            <div id="recognitionStatus" class="p-6 rounded-xl bg-gradient-to-r from-gray-50 to-gray-100 text-center border border-gray-200">
+                <p class="text-sm text-gray-500 mb-2">Arahkan wajah ke kamera</p>
+                <p id="recognizedName" class="text-2xl md:text-3xl font-bold text-gray-800">-</p>
             </div>
+        </section>
 
-            <!-- Location Status -->
-            <div class="inline-flex items-center gap-2 bg-white px-6 py-3 rounded-full shadow-lg border border-gray-200">
-                <span id="locationIcon" class="text-xl">📍</span>
-                <span id="locationText" class="text-sm md:text-base font-medium text-gray-700">
-                    Mendapatkan lokasi...
-                </span>
-                <button 
-                    id="refreshLocationBtn"
-                    onclick="updateLocation()"
-                    class="ml-2 p-2 hover:bg-gray-100 rounded-full transition duration-200"
-                    title="Perbarui lokasi">
-                    <svg class="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-                    </svg>
-                </button>
-            </div>
-        </header>
-
-        <!-- ========== MAIN CONTENT ========== -->
-        <main class="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
-
-            <!-- ========== SECTION: KAMERA ========== -->
+        <!-- Attendance Section -->
+        <div class="space-y-6">
             <section class="bg-white rounded-2xl shadow-xl p-6 lg:p-8">
                 <h2 class="text-2xl font-bold mb-6 text-gray-800 flex items-center gap-2">
-                    <span>📸</span>
-                    <span>Kamera</span>
+                    <span>⏰</span>
+                    <span>Absensi</span>
                 </h2>
 
-                <!-- Video Container -->
-                <div class="relative-container rounded-xl overflow-hidden border-4 border-gray-200 shadow-inner mb-4">
-                    <video id="video" autoplay muted playsinline></video>
-                    <canvas id="canvas"></canvas>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <button id="checkInBtn" class="bg-gradient-to-br from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-bold py-6 px-6 rounded-xl shadow-lg transition transform hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none">
+                        <span class="text-4xl mb-2 block">📥</span>
+                        <span class="text-xl block mb-1">MASUK</span>
+                        <span id="checkInTime" class="block text-sm opacity-90">Belum absen</span>
+                    </button>
+
+                    <button id="checkOutBtn" class="bg-gradient-to-br from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white font-bold py-6 px-6 rounded-xl shadow-lg transition transform hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none">
+                        <span class="text-4xl mb-2 block">📤</span>
+                        <span class="text-xl block mb-1">PULANG</span>
+                        <span id="checkOutTime" class="block text-sm opacity-90">Belum absen</span>
+                    </button>
                 </div>
 
-                <!-- Recognition Status -->
-                <div id="recognitionStatus" class="p-6 rounded-xl bg-gradient-to-r from-gray-50 to-gray-100 text-center border border-gray-200">
-                    <p class="text-sm text-gray-500 mb-2">Arahkan wajah ke kamera</p>
-                    <p id="recognizedName" class="text-2xl md:text-3xl font-bold text-gray-800">-</p>
+                <div id="workDuration" class="mt-6 p-6 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border-2 border-blue-200 hidden">
+                    <p class="text-sm text-gray-600 mb-1">⏱️ Durasi Kerja Hari Ini:</p>
+                    <p id="durationText" class="text-2xl md:text-3xl font-bold text-blue-600">
+                        0 jam 0 menit
+                    </p>
                 </div>
             </section>
 
-            <!-- ========== SECTION: ABSENSI & AKTIVITAS ========== -->
-            <div class="space-y-6">
+            <section class="bg-white rounded-2xl shadow-xl p-6 lg:p-8">
+                <h2 class="text-2xl font-bold mb-6 text-gray-800 flex items-center gap-2">
+                    <span>📊</span>
+                    <span>Aktivitas Hari Ini</span>
+                </h2>
 
-                <!-- Absensi Buttons -->
-                <section class="bg-white rounded-2xl shadow-xl p-6 lg:p-8">
-                    <h2 class="text-2xl font-bold mb-6 text-gray-800 flex items-center gap-2">
-                        <span>⏰</span>
-                        <span>Absensi</span>
-                    </h2>
+                <div id="todayActivity" class="space-y-3 max-h-72 overflow-y-auto custom-scrollbar pr-2">
+                    <p class="text-gray-500 text-center py-8">Belum ada aktivitas</p>
+                </div>
+            </section>
+        </div>
 
-                    <!-- Buttons Grid -->
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <!-- Check In Button -->
-                        <button id="checkInBtn" class="bg-gradient-to-br from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-bold py-6 px-6 rounded-xl shadow-lg transition transform hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none">
-                            <span class="text-4xl mb-2 block">📥</span>
-                            <span class="text-xl block mb-1">MASUK</span>
-                            <span id="checkInTime" class="block text-sm opacity-90">Belum absen</span>
-                        </button>
+    </main>
 
-                        <!-- Check Out Button -->
-                        <button id="checkOutBtn" class="bg-gradient-to-br from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white font-bold py-6 px-6 rounded-xl shadow-lg transition transform hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none">
-                            <span class="text-4xl mb-2 block">📤</span>
-                            <span class="text-xl block mb-1">PULANG</span>
-                            <span id="checkOutTime" class="block text-sm opacity-90">Belum absen</span>
-                        </button>
-                    </div>
+    <footer class="mt-8 text-center text-gray-600 text-sm">
+        <p>&copy; 2024 PT Trakindo Utama. All rights reserved.</p>
+    </footer>
 
-                    <!-- Work Duration -->
-                    <div id="workDuration" class="mt-6 p-6 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border-2 border-blue-200 hidden">
-                        <p class="text-sm text-gray-600 mb-1">⏱️ Durasi Kerja Hari Ini:</p>
-                        <p id="durationText" class="text-2xl md:text-3xl font-bold text-blue-600">
-                            0 jam 0 menit
-                        </p>
-                    </div>
-                </section>
+</div>
 
-                <!-- Today Activity -->
-                <section class="bg-white rounded-2xl shadow-xl p-6 lg:p-8">
-                    <h2 class="text-2xl font-bold mb-6 text-gray-800 flex items-center gap-2">
-                        <span>📊</span>
-                        <span>Aktivitas Hari Ini</span>
-                    </h2>
-
-                    <div id="todayActivity" class="space-y-3 max-h-72 overflow-y-auto custom-scrollbar pr-2">
-                        <p class="text-gray-500 text-center py-8">Belum ada aktivitas</p>
-                    </div>
-                </section>
-
-            </div>
-
-        </main>
-
-        <!-- ========== FOOTER ========== -->
-        <footer class="mt-8 text-center text-gray-600 text-sm">
-            <p>&copy; 2024 Sistem Absensi Karyawan. All rights reserved.</p>
-        </footer>
-
-    </div>
-
-    <!-- ========== JAVASCRIPT ========== -->
-    <script>
+<!-- JavaScript -->
+<script>
     // ===================================
     // VOICE MANAGER
     // ===================================
@@ -280,7 +247,6 @@
 
         speak(text) {
             if (!('speechSynthesis' in window)) return;
-
             this.synthesis.cancel();
             const utterance = new SpeechSynthesisUtterance(text);
             utterance.lang = 'id-ID';
@@ -367,7 +333,6 @@
     let locationManager = null;
     let faceMatcher = null;
     let currentUser = null;
-    let faceApiLoaded = false;
 
     // ===================================
     // DOM ELEMENTS
@@ -393,48 +358,6 @@
     const dateElement = document.getElementById('date');
     const locationText = document.getElementById('locationText');
     const locationIcon = document.getElementById('locationIcon');
-
-    // ===================================
-    // LAZY LOAD FACE-API
-    // ===================================
-    async function loadFaceAPI() {
-        if (faceApiLoaded) return true;
-        
-        try {
-            loaderText.innerText = 'Memuat Face Recognition...';
-            
-            // Load face-api.js
-            if (typeof faceapi === 'undefined') {
-                const script = document.createElement('script');
-                script.src = 'https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js';
-                document.head.appendChild(script);
-                
-                await new Promise((resolve, reject) => {
-                    script.onload = resolve;
-                    script.onerror = reject;
-                });
-            }
-            
-            // Load models
-            const MODEL_URL = 'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@0.22.2/weights';
-            
-            loaderText.innerText = 'Memuat model deteksi wajah...';
-            await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
-
-            loaderText.innerText = 'Memuat model landmark wajah...';
-            await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
-
-            loaderText.innerText = 'Memuat model pengenalan wajah...';
-            await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
-            
-            faceApiLoaded = true;
-            console.log('✅ Face-API loaded');
-            return true;
-        } catch (error) {
-            console.error('❌ Failed to load Face-API:', error);
-            return false;
-        }
-    }
 
     // ===================================
     // CLOCK UPDATE
@@ -491,7 +414,29 @@
     }
 
     // ===================================
-    // START WEBCAM
+    // LOAD MODELS (Original approach - SIMPLE)
+    // ===================================
+    async function loadModels() {
+        const MODEL_URL = 'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@0.22.2/weights';
+        try {
+            loaderText.innerText = 'Memuat model deteksi wajah...';
+            await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
+
+            loaderText.innerText = 'Memuat model landmark wajah...';
+            await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
+
+            loaderText.innerText = 'Memuat model pengenalan wajah...';
+            await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
+
+            return true;
+        } catch (error) {
+            console.error("Gagal memuat model:", error);
+            return false;
+        }
+    }
+
+    // ===================================
+    // START WEBCAM (Original - SIMPLE)
     // ===================================
     function startWebcam() {
         navigator.mediaDevices.getUserMedia({ 
@@ -510,77 +455,55 @@
     }
 
     // ===================================
-    // LOAD FACE MATCHER (UPDATED for new format)
+    // LOAD FACE MATCHER (FIXED for new format)
     // ===================================
     async function loadFaceMatcher() {
         if (!storage) {
             console.error('Storage not initialized');
             return;
         }
-    
+
         try {
             const users = await storage.getUsers();
-            console.log('📥 Loaded users from database:', users);
+            console.log('Loaded users:', users);
             
-            if (!users || users.length === 0) {
-                console.warn('⚠️ No users in database');
+            if (users && users.length > 0) {
+                const labeledDescriptors = users.map(user => {
+                    // Handle BOTH old and new format
+                    let descriptors;
+                    
+                    if (Array.isArray(user.descriptors)) {
+                        // New format: array of arrays
+                        descriptors = user.descriptors.map(desc => {
+                            if (desc instanceof Float32Array) {
+                                return desc;
+                            } else if (Array.isArray(desc)) {
+                                return new Float32Array(desc);
+                            } else {
+                                // Old format: object with numeric keys
+                                return new Float32Array(Object.values(desc));
+                            }
+                        });
+                    } else {
+                        console.warn('Unexpected descriptor format for user:', user.label);
+                        return null;
+                    }
+                    
+                    return new faceapi.LabeledFaceDescriptors(user.label, descriptors);
+                }).filter(d => d !== null);
+                
+                faceMatcher = new faceapi.FaceMatcher(labeledDescriptors, 0.6);
+                console.log('✅ Face matcher initialized with', labeledDescriptors.length, 'users');
+            } else {
+                console.warn('No users found in database');
                 showAlert(
                     'Belum Ada Karyawan Terdaftar', 
-                    'Silakan hubungi admin untuk mendaftarkan wajah Anda terlebih dahulu', 
+                    'Silakan hubungi admin untuk mendaftarkan wajah Anda', 
                     '⚠️'
                 );
-                return;
             }
-            
-            // Filter valid users
-            const validUsers = users.filter(user => {
-                if (!user.descriptors || !Array.isArray(user.descriptors)) {
-                    console.warn('⚠️ User has no valid descriptors:', user.label);
-                    return false;
-                }
-                if (user.descriptors.length === 0) {
-                    console.warn('⚠️ User has empty descriptors:', user.label);
-                    return false;
-                }
-                return true;
-            });
-            
-            console.log(`✅ Valid users: ${validUsers.length} / ${users.length}`);
-            
-            if (validUsers.length === 0) {
-                showAlert(
-                    'Data Wajah Tidak Valid', 
-                    'Tidak ada karyawan dengan data wajah yang valid', 
-                    '❌'
-                );
-                return;
-            }
-            
-            // Create labeled descriptors
-            const labeledDescriptors = validUsers.map(user => {
-                const descriptors = user.descriptors.map(desc => {
-                    // Convert to Float32Array if needed
-                    return desc instanceof Float32Array ? desc : new Float32Array(desc);
-                });
-                
-                return new faceapi.LabeledFaceDescriptors(user.label, descriptors);
-            });
-            
-            // Create face matcher
-            faceMatcher = new faceapi.FaceMatcher(labeledDescriptors, 0.6);
-            console.log('✅ Face matcher initialized with', labeledDescriptors.length, 'users');
-            
-            if (voiceManager) {
-                voiceManager.speak(`Sistem siap. ${labeledDescriptors.length} karyawan terdaftar.`);
-            }
-            
         } catch (error) {
-            console.error('❌ Error loading face matcher:', error);
-            showAlert(
-                'Gagal Memuat Sistem Pengenalan Wajah',
-                error.message,
-                '❌'
-            );
+            console.error('Error loading face matcher:', error);
         }
     }
 
@@ -604,7 +527,6 @@
                 return;
             }
 
-            // Update button status
             const checkIn = activities.find(a => a.type === 'check-in');
             const checkOut = activities.find(a => a.type === 'check-out');
 
@@ -633,7 +555,6 @@
                 checkOutTime.textContent = 'Belum absen';
             }
 
-            // Calculate duration
             if (checkIn && checkOut) {
                 const duration = new Date(checkOut.timestamp) - new Date(checkIn.timestamp);
                 const hours = Math.floor(duration / (1000 * 60 * 60));
@@ -642,7 +563,6 @@
                 workDuration.classList.remove('hidden');
             }
 
-            // Display activities
             activities.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
             activities.forEach(activity => {
                 const div = document.createElement('div');
@@ -679,14 +599,12 @@
             return;
         }
 
-        // Check if offline
         if (!navigator.onLine) {
             showAlert("Mode Offline", "Fitur absensi memerlukan koneksi internet", "⚠️");
             return;
         }
 
         try {
-            // Check if already done today
             const todayAttendance = await storage.getTodayAttendance(currentUser);
             const alreadyDone = todayAttendance.find(a => a.type === type);
 
@@ -699,18 +617,15 @@
                 return;
             }
 
-            // Update location
             await updateLocation();
             const location = locationManager ? locationManager.currentLocation : null;
 
-            // Save attendance
             await storage.addAttendance({
                 name: currentUser,
                 type: type,
                 location: location
             });
 
-            // Show success
             const typeText = type === 'check-in' ? 'Masuk' : 'Pulang';
             showAlert(
                 `Absensi ${typeText} Berhasil!`,
@@ -718,7 +633,6 @@
                 type === 'check-in' ? '✅' : '👋'
             );
 
-            // Update UI
             await updateTodayActivity();
         } catch (error) {
             console.error('Error handling attendance:', error);
@@ -730,7 +644,7 @@
     checkOutBtn.addEventListener('click', () => handleAttendance('check-out'));
 
     // ===================================
-    // FACE DETECTION LOOP
+    // FACE DETECTION LOOP (ORIGINAL - DEFAULT OPTIONS!)
     // ===================================
     video.addEventListener('play', () => {
         const displaySize = { width: video.videoWidth, height: video.videoHeight };
@@ -746,6 +660,7 @@
             }
 
             try {
+                // ☝️ KUNCI: DEFAULT OPTIONS - No custom params!
                 const detections = await faceapi
                     .detectAllFaces(video, new faceapi.TinyFaceDetectorOptions())
                     .withFaceLandmarks()
@@ -825,35 +740,20 @@
         }
     }
 
-    window.addEventListener('online', () => {
-        updateNetworkStatus();
-        if (window.pwaManager) {
-            window.pwaManager.showToast('Koneksi kembali', '✅');
-        }
-    });
-
-    window.addEventListener('offline', () => {
-        updateNetworkStatus();
-        if (window.pwaManager) {
-            window.pwaManager.showToast('Mode offline - Fitur terbatas', '⚠️');
-        }
-    });
-
-    // Initial check
+    window.addEventListener('online', updateNetworkStatus);
+    window.addEventListener('offline', updateNetworkStatus);
     updateNetworkStatus();
 
     // ===================================
-    // INITIALIZE APPLICATION
+    // INITIALIZE APPLICATION (ORIGINAL - SIMPLE)
     // ===================================
     async function initialize() {
         try {
             loaderText.innerText = 'Menginisialisasi sistem...';
             
-            // Initialize managers
             voiceManager = new VoiceManager();
             locationManager = new LocationManager();
             
-            // Wait for Firebase to be ready
             loaderText.innerText = 'Menghubungkan ke Firebase...';
             
             let attempts = 0;
@@ -875,27 +775,21 @@
                 await storage.waitForConnection();
             }
             
-            // Load face detection models (Lazy)
-            const modelsLoaded = await loadFaceAPI();
+            const modelsLoaded = await loadModels();
             if (!modelsLoaded) {
                 throw new Error('Gagal memuat model face detection');
             }
             
-            // Load face matcher
             loaderText.innerText = 'Memuat data wajah...';
             await loadFaceMatcher();
             
-            // Get location
             loaderText.innerText = 'Mendapatkan lokasi...';
             updateLocation();
             
-            // Hide loader
             loaderContainer.style.display = 'none';
             
-            // Start webcam
             startWebcam();
             
-            // Speak ready message
             if (voiceManager) {
                 voiceManager.speak('Sistem absensi siap digunakan');
             }
@@ -916,21 +810,33 @@
     }
 
     // ===================================
-    // WAIT FOR DEPENDENCIES AND START
+    // START (ORIGINAL - SIMPLE)
     // ===================================
     window.addEventListener('load', () => {
         setTimeout(() => {
             initialize();
         }, 500);
     });
+
+    // ===================================
+    // TOAST NOTIFICATION
+    // ===================================
+    function showToast(message, icon = 'ℹ️') {
+        const toast = document.createElement('div');
+        toast.className = 'fixed bottom-20 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white px-6 py-3 rounded-lg shadow-lg z-50 flex items-center gap-2 transition-opacity duration-300';
+        toast.innerHTML = `<span>${icon}</span><span class="text-sm">${message}</span>`;
+        
+        document.body.appendChild(toast);
+        
+        setTimeout(() => {
+            toast.style.opacity = '0';
+            setTimeout(() => toast.remove(), 300);
+        }, 3000);
+    }
 </script>
 
-<!-- PWA Manager (Reusable) -->
+<!-- PWA Manager -->
 <script src="/pwa-init.js"></script>
 
 </body>
 </html>
-
-
-
-
