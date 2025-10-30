@@ -3,70 +3,23 @@ service cloud.firestore {
   match /databases/{database}/documents {
     
     // ========================================
-    // Helper Functions
+    // DEVELOPMENT MODE - PUBLIC ACCESS
+    // ⚠️ GANTI KE PRODUCTION MODE SAAT DEPLOY!
     // ========================================
-    function isSignedIn() {
-      return request.auth != null;
-    }
     
-    function isAdmin() {
-      return isSignedIn() && 
-             exists(/databases/$(database)/documents/admins/$(request.auth.uid));
-    }
-    
-    // ========================================
-    // Users Collection (Face Data)
-    // ========================================
+    // Users Collection
     match /users/{userId} {
-      // Anyone can read (untuk face recognition)
-      allow read: if isSignedIn();
-      
-      // Only admin can write
-      allow write: if isAdmin();
+      allow read, write: if true;  // ⚠️ PUBLIC ACCESS
     }
     
-    // ========================================
     // Employees Collection
-    // ========================================
     match /employees/{employeeId} {
-      // Anyone can read
-      allow read: if isSignedIn();
-      
-      // Only admin can write
-      allow write: if isAdmin();
+      allow read, write: if true;  // ⚠️ PUBLIC ACCESS
     }
     
-    // ========================================
     // Attendance Collection
-    // ========================================
     match /attendance/{attendanceId} {
-      // Anyone can read their own attendance
-      allow read: if isSignedIn();
-      
-      // Employees can create their own attendance
-      allow create: if isSignedIn() && 
-                      request.resource.data.timestamp is timestamp;
-      
-      // Only admin can update/delete
-      allow update, delete: if isAdmin();
-    }
-    
-    // ========================================
-    // Admins Collection
-    // ========================================
-    match /admins/{adminId} {
-      // Only admins can read
-      allow read: if isAdmin();
-      
-      // No one can write (manage via Firebase Console)
-      allow write: if false;
-    }
-    
-    // ========================================
-    // Connection Test (untuk debug)
-    // ========================================
-    match /connection_test/{docId} {
-      allow read, write: if isSignedIn();
+      allow read, write: if true;  // ⚠️ PUBLIC ACCESS
     }
   }
 }
