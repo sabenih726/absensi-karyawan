@@ -17,20 +17,11 @@
     <!-- PWA Manifest -->
     <link rel="manifest" href="/manifest.json">
     
-    <!-- iOS Icons -->
-    <link rel="apple-touch-icon" href="/icons/icon-152x152.png">
-    <link rel="apple-touch-icon" sizes="72x72" href="/icons/icon-72x72.png">
-    <link rel="apple-touch-icon" sizes="96x96" href="/icons/icon-96x96.png">
-    <link rel="apple-touch-icon" sizes="128x128" href="/icons/icon-128x128.png">
-    <link rel="apple-touch-icon" sizes="144x144" href="/icons/icon-144x144.png">
-    <link rel="apple-touch-icon" sizes="152x152" href="/icons/icon-152x152.png">
-    <link rel="apple-touch-icon" sizes="192x192" href="/icons/icon-192x192.png">
-    <link rel="apple-touch-icon" sizes="384x384" href="/icons/icon-384x384.png">
-    <link rel="apple-touch-icon" sizes="512x512" href="/icons/icon-512x512.png">
-    
-    <!-- Favicon -->
-    <link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-72x72.png">
-    <link rel="icon" type="image/png" sizes="16x16" href="/icons/icon-72x72.png">
+    <!-- Icons - PERBAIKAN PATH -->
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
+    <link rel="icon" type="image/png" sizes="512x512" href="/icons/icon-512x512.png">
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+    <link rel="shortcut icon" href="/icons/favicon.ico">
     
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
@@ -109,7 +100,7 @@
         <div class="mt-6 pt-4 border-t border-gray-200">
             <div class="flex items-center justify-center gap-2 text-xs text-gray-500">
                 <span id="pwa-status-icon">⚙️</span>
-                <span id="pwa-status-text">Checking PWA status...</span>
+                <span id="pwa-status-text">Loading PWA...</span>
             </div>
         </div>
         
@@ -124,7 +115,7 @@
         </div>
     </div>
 
-    <!-- Check Admin Auth Status -->
+    <!-- Admin Auth Check -->
     <script type="module">
         import { waitForAdminAuth } from './admin-auth.js';
 
@@ -132,261 +123,33 @@
         const adminBtnText = document.getElementById('adminBtnText');
         const adminBtnSubtext = document.getElementById('adminBtnSubtext');
 
-        // Check if admin is already logged in
         waitForAdminAuth().then(user => {
             if (user) {
-                // User sudah login
                 adminBtnText.textContent = 'Dashboard Admin';
                 adminBtnSubtext.innerHTML = '✅ Logged in as: ' + user.email.split('@')[0];
-                
-                adminBtn.addEventListener('click', () => {
-                    window.location.href = 'admin.html';
-                });
+                adminBtn.addEventListener('click', () => window.location.href = 'admin.html');
             } else {
-                // User belum login
                 adminBtnText.textContent = 'Dashboard Admin';
                 adminBtnSubtext.innerHTML = '🔐 Login diperlukan';
-                
-                adminBtn.addEventListener('click', () => {
-                    window.location.href = 'login.html';
-                });
+                adminBtn.addEventListener('click', () => window.location.href = 'login.html');
             }
         });
     </script>
 
+    <!-- Basic Scripts -->
     <script>
-        // Auto-update copyright year
+        // Copyright
         document.getElementById('copyright').textContent = `© ${new Date().getFullYear()} Sistem Absensi`;
         
-        // Add loading indicator
+        // Smooth page load
         window.addEventListener('load', () => {
             document.body.style.opacity = '0';
             document.body.style.transition = 'opacity 0.3s';
-            setTimeout(() => {
-                document.body.style.opacity = '1';
-            }, 100);
-        });
-
-        // Check PWA status
-        window.addEventListener('load', () => {
-            const statusIcon = document.getElementById('pwa-status-icon');
-            const statusText = document.getElementById('pwa-status-text');
-            
-            if ('serviceWorker' in navigator) {
-                navigator.serviceWorker.getRegistration().then(registration => {
-                    if (registration) {
-                        statusIcon.textContent = '✅';
-                        statusText.textContent = 'PWA Active - Ready for offline';
-                    } else {
-                        statusIcon.textContent = '⏳';
-                        statusText.textContent = 'PWA Activating...';
-                    }
-                });
-            } else {
-                statusIcon.textContent = '❌';
-                statusText.textContent = 'PWA not supported';
-            }
+            setTimeout(() => document.body.style.opacity = '1', 100);
         });
     </script>
 
-    <!-- PWA Install Prompt & Service Worker -->
-    <script>
-        // ============================================
-        // 📱 PWA INSTALL PROMPT
-        // ============================================
-        let deferredPrompt;
-        
-        window.addEventListener('beforeinstallprompt', (e) => {
-            console.log('💾 PWA install prompt triggered');
-            e.preventDefault();
-            deferredPrompt = e;
-            
-            // Show custom install button/banner
-            showInstallPromotion();
-        });
-        
-        function showInstallPromotion() {
-            // Create install banner
-            const banner = document.createElement('div');
-            banner.id = 'pwa-install-banner';
-            banner.className = 'fixed bottom-4 left-4 right-4 bg-gradient-to-r from-blue-500 to-indigo-600 text-white p-4 rounded-lg shadow-2xl z-50 transform transition-all duration-300';
-            banner.innerHTML = `
-                <div class="flex items-center justify-between gap-4">
-                    <div class="flex items-center gap-3">
-                        <span class="text-3xl">📱</span>
-                        <div>
-                            <p class="font-bold text-sm">Install Aplikasi</p>
-                            <p class="text-xs opacity-90">Akses lebih cepat & bisa offline</p>
-                        </div>
-                    </div>
-                    <div class="flex gap-2">
-                        <button 
-                            id="pwa-install-btn" 
-                            class="bg-white text-blue-600 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-50 transition">
-                            Install
-                        </button>
-                        <button 
-                            id="pwa-dismiss-btn" 
-                            class="text-white hover:text-blue-100 transition">
-                            ✕
-                        </button>
-                    </div>
-                </div>
-            `;
-            
-            document.body.appendChild(banner);
-            
-            // Install button handler
-            document.getElementById('pwa-install-btn').addEventListener('click', async () => {
-                if (!deferredPrompt) return;
-                
-                deferredPrompt.prompt();
-                const { outcome } = await deferredPrompt.userChoice;
-                
-                console.log(`User response: ${outcome}`);
-                deferredPrompt = null;
-                banner.remove();
-                
-                if (outcome === 'accepted') {
-                    showToast('Aplikasi berhasil diinstall! 🎉', '✅');
-                }
-            });
-            
-            // Dismiss button handler
-            document.getElementById('pwa-dismiss-btn').addEventListener('click', () => {
-                banner.remove();
-                localStorage.setItem('pwa-install-dismissed', Date.now());
-            });
-            
-            // Auto dismiss after 15 seconds
-            setTimeout(() => {
-                if (document.getElementById('pwa-install-banner')) {
-                    banner.remove();
-                }
-            }, 15000);
-        }
-        
-        // Check if already dismissed recently
-        window.addEventListener('load', () => {
-            const dismissed = localStorage.getItem('pwa-install-dismissed');
-            if (dismissed) {
-                const daysSince = (Date.now() - parseInt(dismissed)) / (1000 * 60 * 60 * 24);
-                if (daysSince < 7) {
-                    // Don't show again for 7 days
-                    return;
-                }
-            }
-        });
-        
-        // ============================================
-        // 🔄 SERVICE WORKER REGISTRATION
-        // ============================================
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', async () => {
-                try {
-                    const registration = await navigator.serviceWorker.register('/service-worker.js', {
-                        scope: '/'
-                    });
-                    
-                    console.log('✅ Service Worker registered:', registration.scope);
-                    
-                    // Check for updates
-                    registration.addEventListener('updatefound', () => {
-                        const newWorker = registration.installing;
-                        
-                        newWorker.addEventListener('statechange', () => {
-                            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                                // New version available
-                                showUpdateNotification(registration);
-                            }
-                        });
-                    });
-                    
-                    // Check for updates every hour
-                    setInterval(() => {
-                        registration.update();
-                    }, 60 * 60 * 1000);
-                    
-                } catch (error) {
-                    console.error('❌ Service Worker registration failed:', error);
-                }
-            });
-        }
-        
-        // ============================================
-        // 🔔 UPDATE NOTIFICATION
-        // ============================================
-        function showUpdateNotification(registration) {
-            const banner = document.createElement('div');
-            banner.className = 'fixed top-4 left-4 right-4 bg-green-500 text-white p-4 rounded-lg shadow-2xl z-50 transform transition-all duration-300';
-            banner.innerHTML = `
-                <div class="flex items-center justify-between gap-4">
-                    <div class="flex items-center gap-3">
-                        <span class="text-2xl">🔄</span>
-                        <div>
-                            <p class="font-bold text-sm">Update Tersedia</p>
-                            <p class="text-xs opacity-90">Versi baru aplikasi sudah siap</p>
-                        </div>
-                    </div>
-                    <button 
-                        id="update-btn" 
-                        class="bg-white text-green-600 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-green-50 transition">
-                        Update
-                    </button>
-                </div>
-            `;
-            
-            document.body.appendChild(banner);
-            
-            document.getElementById('update-btn').addEventListener('click', () => {
-                if (registration.waiting) {
-                    registration.waiting.postMessage({ type: 'SKIP_WAITING' });
-                    window.location.reload();
-                }
-            });
-        }
-        
-        // ============================================
-        // 📊 NETWORK STATUS MONITOR
-        // ============================================
-        window.addEventListener('online', () => {
-            console.log('🌐 Back online');
-            showToast('Koneksi kembali', '✅');
-        });
-        
-        window.addEventListener('offline', () => {
-            console.log('📡 Gone offline');
-            showToast('Mode offline - Beberapa fitur terbatas', '⚠️');
-        });
-        
-        function showToast(message, icon = 'ℹ️') {
-            const toast = document.createElement('div');
-            toast.className = 'fixed bottom-20 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white px-6 py-3 rounded-lg shadow-lg z-50 flex items-center gap-2 transition-opacity duration-300';
-            toast.innerHTML = `<span>${icon}</span><span class="text-sm">${message}</span>`;
-            
-            document.body.appendChild(toast);
-            
-            setTimeout(() => {
-                toast.style.opacity = '0';
-                setTimeout(() => toast.remove(), 300);
-            }, 3000);
-        }
-
-        // ============================================
-        // 📱 DETECT INSTALLED APP
-        // ============================================
-        window.addEventListener('appinstalled', () => {
-            console.log('✅ App installed successfully');
-            showToast('Aplikasi berhasil diinstall! 🎉', '✅');
-            localStorage.setItem('pwa-installed', 'true');
-        });
-
-        // Check if app is running in standalone mode
-        if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true) {
-            console.log('📱 Running in standalone mode');
-            document.getElementById('pwa-status-icon').textContent = '📱';
-            document.getElementById('pwa-status-text').textContent = 'Running as app';
-        }
-    </script>
+    <!-- PWA Manager (All PWA logic) -->
+    <script src="/pwa-init.js"></script>
 </body>
 </html>
